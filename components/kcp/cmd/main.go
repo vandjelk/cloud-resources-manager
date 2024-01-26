@@ -26,6 +26,7 @@ import (
 
 	"github.com/kyma-project/cloud-manager/components/kcp/pkg/common/abstractions"
 	"github.com/kyma-project/cloud-manager/components/kcp/pkg/common/actions/focal"
+	"github.com/kyma-project/cloud-manager/components/kcp/pkg/composed"
 	"github.com/kyma-project/cloud-manager/components/kcp/pkg/iprange"
 	"github.com/kyma-project/cloud-manager/components/kcp/pkg/nfsinstance"
 	awsiprange "github.com/kyma-project/cloud-manager/components/kcp/pkg/provider/aws/iprange"
@@ -39,7 +40,6 @@ import (
 	gcpnfsinstance "github.com/kyma-project/cloud-manager/components/kcp/pkg/provider/gcp/nfsinstance"
 	gcpFilestoreClient "github.com/kyma-project/cloud-manager/components/kcp/pkg/provider/gcp/nfsinstance/client"
 	skrruntime "github.com/kyma-project/cloud-manager/components/kcp/pkg/skr/runtime"
-	"github.com/kyma-project/cloud-manager/components/lib/composed"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 

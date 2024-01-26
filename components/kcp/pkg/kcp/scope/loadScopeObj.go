@@ -2,7 +2,7 @@ package scope
 
 import (
 	"context"
-	"github.com/kyma-project/cloud-manager/components/lib/composed"
+	"github.com/kyma-project/cloud-manager/components/kcp/pkg/composed"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 )
 

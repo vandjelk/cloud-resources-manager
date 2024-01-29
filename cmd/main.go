@@ -21,6 +21,16 @@ import (
 	"fmt"
 	"github.com/kyma-project/cloud-manager/components/kcp/pkg/kcp/iprange"
 	"github.com/kyma-project/cloud-manager/components/kcp/pkg/kcp/nfsinstance"
+	awsiprange "github.com/kyma-project/cloud-manager/components/kcp/pkg/kcp/provider/aws/iprange"
+	awsiprangeclient "github.com/kyma-project/cloud-manager/components/kcp/pkg/kcp/provider/aws/iprange/client"
+	awsnfsinstance "github.com/kyma-project/cloud-manager/components/kcp/pkg/kcp/provider/aws/nfsinstance"
+	awsnfsinstanceclient "github.com/kyma-project/cloud-manager/components/kcp/pkg/kcp/provider/aws/nfsinstance/client"
+	azureiprange "github.com/kyma-project/cloud-manager/components/kcp/pkg/kcp/provider/azure/iprange"
+	azurenfsinstance "github.com/kyma-project/cloud-manager/components/kcp/pkg/kcp/provider/azure/nfsinstance"
+	gcpiprange "github.com/kyma-project/cloud-manager/components/kcp/pkg/kcp/provider/gcp/iprange"
+	client2 "github.com/kyma-project/cloud-manager/components/kcp/pkg/kcp/provider/gcp/iprange/client"
+	gcpnfsinstance "github.com/kyma-project/cloud-manager/components/kcp/pkg/kcp/provider/gcp/nfsinstance"
+	gcpFilestoreClient "github.com/kyma-project/cloud-manager/components/kcp/pkg/kcp/provider/gcp/nfsinstance/client"
 	"os"
 
 	kcpscope "github.com/kyma-project/cloud-manager/components/kcp/pkg/kcp/scope"
@@ -29,16 +39,6 @@ import (
 	"github.com/kyma-project/cloud-manager/components/kcp/pkg/common/abstractions"
 	"github.com/kyma-project/cloud-manager/components/kcp/pkg/common/actions/focal"
 	"github.com/kyma-project/cloud-manager/components/kcp/pkg/composed"
-	awsiprange "github.com/kyma-project/cloud-manager/components/kcp/pkg/provider/aws/iprange"
-	awsiprangeclient "github.com/kyma-project/cloud-manager/components/kcp/pkg/provider/aws/iprange/client"
-	awsnfsinstance "github.com/kyma-project/cloud-manager/components/kcp/pkg/provider/aws/nfsinstance"
-	awsnfsinstanceclient "github.com/kyma-project/cloud-manager/components/kcp/pkg/provider/aws/nfsinstance/client"
-	azureiprange "github.com/kyma-project/cloud-manager/components/kcp/pkg/provider/azure/iprange"
-	azurenfsinstance "github.com/kyma-project/cloud-manager/components/kcp/pkg/provider/azure/nfsinstance"
-	gcpiprange "github.com/kyma-project/cloud-manager/components/kcp/pkg/provider/gcp/iprange"
-	gcpiprangeclient "github.com/kyma-project/cloud-manager/components/kcp/pkg/provider/gcp/iprange/client"
-	gcpnfsinstance "github.com/kyma-project/cloud-manager/components/kcp/pkg/provider/gcp/nfsinstance"
-	gcpFilestoreClient "github.com/kyma-project/cloud-manager/components/kcp/pkg/provider/gcp/nfsinstance/client"
 	skrruntime "github.com/kyma-project/cloud-manager/components/kcp/pkg/skr/runtime"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -180,7 +180,7 @@ func main() {
 			focal.NewStateFactory(),
 			awsiprange.NewStateFactory(awsiprangeclient.NewClientProvider(), abstractions.NewOSEnvironment()),
 			azureiprange.NewStateFactory(nil),
-			gcpiprange.NewStateFactory(gcpiprangeclient.NewServiceNetworkingClient(), gcpiprangeclient.NewComputeClient(), abstractions.NewOSEnvironment()),
+			gcpiprange.NewStateFactory(client2.NewServiceNetworkingClient(), client2.NewComputeClient(), abstractions.NewOSEnvironment()),
 		),
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "IpRange")

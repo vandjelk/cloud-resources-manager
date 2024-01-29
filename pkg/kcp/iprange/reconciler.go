@@ -2,13 +2,13 @@ package iprange
 
 import (
 	"context"
+	iprange2 "github.com/kyma-project/cloud-manager/components/kcp/pkg/kcp/provider/aws/iprange"
+	iprange3 "github.com/kyma-project/cloud-manager/components/kcp/pkg/kcp/provider/azure/iprange"
+	"github.com/kyma-project/cloud-manager/components/kcp/pkg/kcp/provider/gcp/iprange"
 
 	cloudresourcesv1beta1 "github.com/kyma-project/cloud-manager/components/kcp/api/cloud-control/v1beta1"
 	"github.com/kyma-project/cloud-manager/components/kcp/pkg/common/actions/focal"
 	"github.com/kyma-project/cloud-manager/components/kcp/pkg/composed"
-	awsiprange "github.com/kyma-project/cloud-manager/components/kcp/pkg/provider/aws/iprange"
-	azureiprange "github.com/kyma-project/cloud-manager/components/kcp/pkg/provider/azure/iprange"
-	gcpiprange "github.com/kyma-project/cloud-manager/components/kcp/pkg/provider/gcp/iprange"
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 )
@@ -17,17 +17,17 @@ type IPRangeReconciler struct {
 	composedStateFactory composed.StateFactory
 	focalStateFactory    focal.StateFactory
 
-	awsStateFactory   awsiprange.StateFactory
-	azureStateFactory azureiprange.StateFactory
-	gcpStateFactory   gcpiprange.StateFactory
+	awsStateFactory   iprange2.StateFactory
+	azureStateFactory iprange3.StateFactory
+	gcpStateFactory   iprange.StateFactory
 }
 
 func NewIPRangeReconciler(
 	composedStateFactory composed.StateFactory,
 	focalStateFactory focal.StateFactory,
-	awsStateFactory awsiprange.StateFactory,
-	azureStateFactory azureiprange.StateFactory,
-	gcpStateFactory gcpiprange.StateFactory,
+	awsStateFactory iprange2.StateFactory,
+	azureStateFactory iprange3.StateFactory,
+	gcpStateFactory iprange.StateFactory,
 ) *IPRangeReconciler {
 	return &IPRangeReconciler{
 		composedStateFactory: composedStateFactory,
@@ -58,9 +58,9 @@ func (r *IPRangeReconciler) newAction() composed.Action {
 				composed.BuildSwitchAction(
 					"providerSwitch",
 					nil,
-					composed.NewCase(focal.AwsProviderPredicate, awsiprange.New(r.awsStateFactory)),
-					composed.NewCase(focal.AzureProviderPredicate, azureiprange.New(r.azureStateFactory)),
-					composed.NewCase(focal.GcpProviderPredicate, gcpiprange.New(r.gcpStateFactory)),
+					composed.NewCase(focal.AwsProviderPredicate, iprange2.New(r.awsStateFactory)),
+					composed.NewCase(focal.AzureProviderPredicate, iprange3.New(r.azureStateFactory)),
+					composed.NewCase(focal.GcpProviderPredicate, iprange.New(r.gcpStateFactory)),
 				),
 			)(ctx, newState(st.(focal.State)))
 		},

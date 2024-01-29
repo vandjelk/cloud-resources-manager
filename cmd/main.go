@@ -20,6 +20,7 @@ import (
 	"flag"
 	"fmt"
 	"github.com/kyma-project/cloud-manager/components/kcp/pkg/kcp/iprange"
+	"github.com/kyma-project/cloud-manager/components/kcp/pkg/kcp/nfsinstance"
 	"os"
 
 	kcpscope "github.com/kyma-project/cloud-manager/components/kcp/pkg/kcp/scope"
@@ -28,7 +29,6 @@ import (
 	"github.com/kyma-project/cloud-manager/components/kcp/pkg/common/abstractions"
 	"github.com/kyma-project/cloud-manager/components/kcp/pkg/common/actions/focal"
 	"github.com/kyma-project/cloud-manager/components/kcp/pkg/composed"
-	"github.com/kyma-project/cloud-manager/components/kcp/pkg/nfsinstance"
 	awsiprange "github.com/kyma-project/cloud-manager/components/kcp/pkg/provider/aws/iprange"
 	awsiprangeclient "github.com/kyma-project/cloud-manager/components/kcp/pkg/provider/aws/iprange/client"
 	awsnfsinstance "github.com/kyma-project/cloud-manager/components/kcp/pkg/provider/aws/nfsinstance"

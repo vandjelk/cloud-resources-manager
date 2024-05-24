@@ -12,7 +12,7 @@ import (
 	"time"
 )
 
-func createVpcPeeringRemote(ctx context.Context, st composed.State) (error, context.Context) {
+func createRemoteVpcPeering(ctx context.Context, st composed.State) (error, context.Context) {
 	state := st.(*State)
 	logger := composed.LoggerFromCtx(ctx)
 	obj := state.ObjAsVpcPeering()

@@ -8,7 +8,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-func updateSuccessStatus(ctx context.Context, st composed.State) (error, context.Context) {
+func updateStatus(ctx context.Context, st composed.State) (error, context.Context) {
 	state := st.(*State)
 	obj := state.ObjAsVpcPeering()
 

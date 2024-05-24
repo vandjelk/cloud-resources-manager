@@ -17,6 +17,10 @@ func createVpcPeeringRemote(ctx context.Context, st composed.State) (error, cont
 	logger := composed.LoggerFromCtx(ctx)
 	obj := state.ObjAsVpcPeering()
 
+	if state.remotePeering != nil {
+		return nil, nil
+	}
+
 	clientId := azureconfig.AzureConfig.ClientId
 	clientSecret := azureconfig.AzureConfig.ClientSecret
 	tenantId := state.tenantId

@@ -83,6 +83,7 @@ func init() {
 	utilruntime.Must(clientgoscheme.AddToScheme(skrScheme))
 	utilruntime.Must(cloudresourcesv1beta1.AddToScheme(skrScheme))
 	utilruntime.Must(apiextensions.AddToScheme(skrScheme))
+	utilruntime.Must(cloudresourcesv1beta1.AddToScheme(scheme))
 	//+kubebuilder:scaffold:scheme
 }
 
@@ -230,6 +231,13 @@ func main() {
 		env,
 	); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "IpRange")
+		os.Exit(1)
+	}
+	if err = (&cloudresourcescontroller.AwsVpcPeeringReconciler{
+		Client: mgr.GetClient(),
+		Scheme: mgr.GetScheme(),
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "AwsVpcPeering")
 		os.Exit(1)
 	}
 	//+kubebuilder:scaffold:builder

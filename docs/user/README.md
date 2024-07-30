@@ -10,6 +10,7 @@ Cloud Manager is a central component that manages access to additional hyperscal
 Cloud Manager can provision the following cloud resources in the underlying cloud provider subscription:
 
 * NFS server that can be used as a ReadWriteMany (RWX) volume in the Kyma cluster
+* VPC peering that can be used to communicate with your resources from Kyma cluster
 
 ## Architecture
 

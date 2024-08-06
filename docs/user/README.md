@@ -38,6 +38,11 @@ The `gcpnfsvolume.cloud-resources.kyma-project.io` CRD describes the GCP Filesto
 instance that can be used as RWX volume in the cluster.
 To learn more, read the [GcpNfsVolume Custom Resource](./resources/04-30-10-gcp-nfs-volume.md)  documentation.
 
+### AzureVpcPeering CR
+
+The `azurevpcpeering.cloud-resources.kyma-project.io` CRD describes the Azure peering connection 
+between Kyma and remote Virtual Network. To learn more, read the [AzureVpcPeering Custom Resource](./resources/04-40-10-azure-vpc-peering.md) documentation.
+
 ## Related Information
 
 To learn more about the Cloud Manager module, read the following:

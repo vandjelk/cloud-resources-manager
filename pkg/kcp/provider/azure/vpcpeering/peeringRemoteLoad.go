@@ -40,6 +40,7 @@ func peeringRemoteLoad(ctx context.Context, st composed.State) (error, context.C
 	}
 
 	if !ok {
+		logger.Info("Remote Azure Peering not loaded")
 		return nil, nil
 	}
 
@@ -72,10 +73,17 @@ func peeringRemoteLoad(ctx context.Context, st composed.State) (error, context.C
 
 		message, isWarning := azuremeta.GetErrorMessage(err)
 
+		chaged := false
 		if isWarning {
-			state.ObjAsVpcPeering().Status.State = string(cloudcontrolv1beta1.WarningState)
+			if state.ObjAsVpcPeering().Status.State != string(cloudcontrolv1beta1.WarningState) {
+				state.ObjAsVpcPeering().Status.State = string(cloudcontrolv1beta1.WarningState)
+				chaged = true
+			}
 		} else {
-			state.ObjAsVpcPeering().Status.State = string(cloudcontrolv1beta1.ErrorState)
+			if state.ObjAsVpcPeering().Status.State != string(cloudcontrolv1beta1.ErrorState) {
+				state.ObjAsVpcPeering().Status.State = string(cloudcontrolv1beta1.ErrorState)
+				chaged = true
+			}
 		}
 
 		reason := cloudcontrolv1beta1.ReasonFailedLoadingRemoteVpcPeeringConnection
@@ -91,7 +99,11 @@ func peeringRemoteLoad(ctx context.Context, st composed.State) (error, context.C
 			Message: message,
 		}
 
-		if !composed.AnyConditionChanged(state.ObjAsVpcPeering(), condition) {
+		if composed.AnyConditionChanged(state.ObjAsVpcPeering(), condition) {
+			chaged = true
+		}
+
+		if !chaged {
 			return nil, nil
 		}
 

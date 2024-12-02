@@ -206,6 +206,34 @@ var _ = Describe("Feature: KCP VpcPeering", func() {
 				).Should(Succeed())
 		})
 
+		// Waits for the reconcilers to create local Azure peering
+		By("Then Azure VPC Peering is created", func() {
+			Eventually(func() error {
+				p, err := azureMockLocal.GetPeering(infra.Ctx(), localResourceGroupName, localVirtualNetworkName, localPeeringName)
+				if err != nil {
+					return err
+				}
+				if p == nil {
+					return errors.New("nil peering received")
+				}
+				return nil
+			}).Should(Succeed())
+		})
+
+		// Waits for the reconcilers to create remote Azure peering
+		By("And Then remote Azure VPC Peering is created", func() {
+			Eventually(func() error {
+				p, err := azureMockRemote.GetPeering(infra.Ctx(), remoteResourceGroup, remoteVnetName, remotePeeringName)
+				if err != nil {
+					return err
+				}
+				if p == nil {
+					return errors.New("nil peering received")
+				}
+				return nil
+			}).Should(Succeed())
+		})
+
 		// Ready ==========================================================
 
 		By("When Azure VPC Peering is Connected", func() {
@@ -311,6 +339,7 @@ var _ = Describe("Feature: KCP VpcPeering", func() {
 			remoteResourceGroup = "MyResourceGroup"
 			remoteVnetName      = "MyVnet"
 			remotePeeringName   = "my-peering"
+			localPeeringName    = "kyma-peering"
 		)
 
 		scope := &cloudcontrolv1beta1.Scope{}
@@ -398,6 +427,7 @@ var _ = Describe("Feature: KCP VpcPeering", func() {
 				WithScope(kymaName).
 				WithRemoteRef("skr-namespace", "skr-azure-vpcpeering").
 				WithDetails(localKcpNetworkName, infra.KCP().Namespace(), remoteKcpNetworkName, infra.KCP().Namespace(), remotePeeringName, true, true).
+				WithLocalPeeringName(localPeeringName).
 				Build()
 
 			Eventually(CreateObj).
@@ -415,7 +445,21 @@ var _ = Describe("Feature: KCP VpcPeering", func() {
 				).Should(Succeed())
 		})
 
-		// Waits for the reconcilers to create Azure peerings
+		// Waits for the reconcilers to create local Azure peering
+		By("Then Azure VPC Peering is created", func() {
+			Eventually(func() error {
+				p, err := azureMockLocal.GetPeering(infra.Ctx(), localResourceGroupName, localVirtualNetworkName, localPeeringName)
+				if err != nil {
+					return err
+				}
+				if p == nil {
+					return errors.New("nil peering received")
+				}
+				return nil
+			}).Should(Succeed())
+		})
+
+		// Waits for the reconcilers to create remote Azure peering
 		By("And Then remote Azure VPC Peering is created", func() {
 			Eventually(func() error {
 				p, err := azureMockRemote.GetPeering(infra.Ctx(), remoteResourceGroup, remoteVnetName, remotePeeringName)
@@ -432,12 +476,12 @@ var _ = Describe("Feature: KCP VpcPeering", func() {
 		// Ready ==========================================================
 
 		By("When Azure VPC Peering is Connected", func() {
-			err := azureMockLocal.SetPeeringStateConnected(infra.Ctx(), localResourceGroupName, localVirtualNetworkName, kcpPeeringName)
+			err := azureMockLocal.SetPeeringStateConnected(infra.Ctx(), localResourceGroupName, localVirtualNetworkName, localPeeringName)
 			Expect(err).ToNot(HaveOccurred())
 			err = azureMockRemote.SetPeeringStateConnected(infra.Ctx(), remoteResourceGroup, remoteVnetName, remotePeeringName)
 			Expect(err).ToNot(HaveOccurred())
 
-			p, err := azureMockLocal.GetPeering(infra.Ctx(), localResourceGroupName, localVirtualNetworkName, kcpPeeringName)
+			p, err := azureMockLocal.GetPeering(infra.Ctx(), localResourceGroupName, localVirtualNetworkName, localPeeringName)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(p).ToNot(BeNil())
 
@@ -456,7 +500,7 @@ var _ = Describe("Feature: KCP VpcPeering", func() {
 				Should(Succeed())
 		})
 
-		By("Then KCP VpcPeering state is Connected", func() {
+		By("And Then KCP VpcPeering state is Connected", func() {
 			Expect(kcpPeering.Status.State).To(Equal(cloudcontrolv1beta1.VirtualNetworkPeeringStateConnected))
 		})
 
@@ -501,7 +545,7 @@ var _ = Describe("Feature: KCP VpcPeering", func() {
 		})
 
 		By("And Then local Azure peering does not exist", func() {
-			peering, err := azureMockLocal.GetPeering(infra.Ctx(), localResourceGroupName, localVirtualNetworkName, kcpPeeringName)
+			peering, err := azureMockLocal.GetPeering(infra.Ctx(), localResourceGroupName, localVirtualNetworkName, localPeeringName)
 			Expect(err).To(HaveOccurred())
 			Expect(azuremeta.IsNotFound(err)).To(BeTrue())
 			Expect(peering).To(BeNil())

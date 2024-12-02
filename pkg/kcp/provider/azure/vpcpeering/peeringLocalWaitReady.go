@@ -18,15 +18,16 @@ func peeringLocalWaitReady(ctx context.Context, st composed.State) (error, conte
 		return composed.StopWithRequeue, nil
 	}
 
-	if ptr.Deref(state.localPeering.Properties.PeeringState, "") != armnetwork.VirtualNetworkPeeringStateConnected {
+	peeringState := ptr.Deref(state.localPeering.Properties.PeeringState, cloudcontrolv1beta1.VirtualNetworkPeeringStateInitiated)
+	if peeringState != armnetwork.VirtualNetworkPeeringStateConnected {
 		logger.Info("Waiting for peering Connected state",
 			"azureLocalPeeringId", ptr.Deref(state.localPeering.ID, ""),
 			"azurePeeringState", ptr.Deref(state.localPeering.Properties.PeeringState, ""))
 
 		changed := false
 
-		if state.ObjAsVpcPeering().Status.State != cloudcontrolv1beta1.VirtualNetworkPeeringStateInitiated {
-			state.ObjAsVpcPeering().Status.State = cloudcontrolv1beta1.VirtualNetworkPeeringStateInitiated
+		if state.ObjAsVpcPeering().Status.State != string(peeringState) {
+			state.ObjAsVpcPeering().Status.State = string(peeringState)
 			changed = true
 		}
 

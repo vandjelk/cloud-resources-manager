@@ -75,3 +75,15 @@ func (in *GcpVpcPeering) SpecificToFeature() featuretypes.FeatureName {
 }
 
 func (in *GcpVpcPeering) SpecificToProviders() []string { return []string{"gcp"} }
+
+func (in *GcpVpcPeering) Id() string {
+	return in.Status.Id
+}
+
+func (in *GcpVpcPeering) SetId(id string) {
+	in.Status.Id = id
+}
+
+func (in *GcpVpcPeering) SetDefaultState() {
+	in.Status.State = "Initiated"
+}

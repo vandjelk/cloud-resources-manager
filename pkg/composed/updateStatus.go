@@ -32,6 +32,13 @@ type ObjWithCloneForPatchStatus interface {
 	CloneForPatchStatus() client.Object
 }
 
+type ObjWithStatusId interface {
+	ObjWithConditions
+	Id() string
+	SetId(id string)
+	SetDefaultState()
+}
+
 func PatchStatus(obj ObjWithConditions) *UpdateStatusBuilder {
 	return &UpdateStatusBuilder{
 		applyType: applyServerSide,

@@ -43,7 +43,7 @@ func (r *reconciler) newAction() composed.Action {
 		feature.LoadFeatureContextFromObj(&cloudresourcesv1beta1.AwsVpcPeering{}),
 		composed.LoadObj,
 		addFinalizer,
-		updateId,
+		composed.UpdateId,
 		loadKcpRemoteNetwork,
 		createKcpRemoteNetwork,
 		loadKcpAwsVpcPeering,

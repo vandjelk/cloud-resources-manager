@@ -100,6 +100,18 @@ func (in *AwsVpcPeering) SetState(v string) {
 	in.Status.State = v
 }
 
+func (in *AwsVpcPeering) Id() string {
+	return in.Status.Id
+}
+
+func (in *AwsVpcPeering) SetId(v string) {
+	in.Status.Id = v
+}
+
+func (in *AwsVpcPeering) SetDefaultState() {
+
+}
+
 //+kubebuilder:object:root=true
 
 // AwsVpcPeeringList contains a list of AwsVpcPeering

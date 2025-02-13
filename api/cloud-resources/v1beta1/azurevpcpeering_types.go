@@ -84,6 +84,18 @@ func (in *AzureVpcPeering) SetState(v string) {
 	in.Status.State = v
 }
 
+func (in *AzureVpcPeering) Id() string {
+	return in.Status.Id
+}
+
+func (in *AzureVpcPeering) SetId(v string) {
+	in.Status.Id = v
+}
+
+func (in *AzureVpcPeering) SetDefaultState() {
+
+}
+
 //+kubebuilder:object:root=true
 
 // AzureVpcPeeringList contains a list of AzureVpcPeering

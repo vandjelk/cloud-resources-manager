@@ -9,6 +9,7 @@ import (
 	azurenetworkclient "github.com/kyma-project/cloud-manager/pkg/kcp/provider/azure/network/client"
 	azureredisclusterclient "github.com/kyma-project/cloud-manager/pkg/kcp/provider/azure/rediscluster/client"
 	azureredisinstanceclient "github.com/kyma-project/cloud-manager/pkg/kcp/provider/azure/redisinstance/client"
+	azurevnetlinkclient "github.com/kyma-project/cloud-manager/pkg/kcp/provider/azure/vnetlink/client"
 	azurevpcpeeringclient "github.com/kyma-project/cloud-manager/pkg/kcp/provider/azure/vpcpeering/client"
 	azurerwxvolumebackupclient "github.com/kyma-project/cloud-manager/pkg/skr/azurerwxvolumebackup/client"
 	"sync"
@@ -68,6 +69,12 @@ func (s *server) NetworkProvider() azureclient.ClientProvider[azurenetworkclient
 func (s *server) ExposeDataProvider() azureclient.ClientProvider[azureexposeddataclient.Client] {
 	return func(ctx context.Context, clientId, clientSecret, subscriptionId, tenantId string, _ ...string) (azureexposeddataclient.Client, error) {
 		return s.getTenantStoreSubscriptionContext(subscriptionId, tenantId), nil
+	}
+}
+
+func (s *server) VNetLinkProvider() azureclient.ClientProvider[azurevnetlinkclient.Client] {
+	return func(_ context.Context, _, _, subscription, tenant string, auxiliaryTenants ...string) (azurevnetlinkclient.Client, error) {
+		return s.getTenantStoreSubscriptionContext(subscription, tenant), nil
 	}
 }
 

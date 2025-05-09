@@ -160,6 +160,13 @@ var _ = BeforeSuite(func() {
 		env,
 	)).To(Succeed())
 
+	//AzureVNetLink
+	Expect(SetupAzureVNetLinkReconciler(
+		infra.KcpManager(),
+		infra.AzureMock().VNetLinkProvider(),
+		env,
+	)).NotTo(HaveOccurred())
+
 	// Start controllers
 	infra.StartKcpControllers(context.Background())
 })

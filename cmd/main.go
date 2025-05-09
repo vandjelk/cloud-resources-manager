@@ -20,6 +20,7 @@ import (
 	"context"
 	"flag"
 	awsexposeddataclient "github.com/kyma-project/cloud-manager/pkg/kcp/provider/aws/exposedData/client"
+	azurevnetlinkclient "github.com/kyma-project/cloud-manager/pkg/kcp/provider/azure/vnetlink/client"
 	"os"
 
 	"github.com/kyma-project/cloud-manager/pkg/composed"
@@ -427,6 +428,15 @@ func main() {
 		env,
 	); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "GcpSubnet")
+		os.Exit(1)
+	}
+
+	if err = cloudcontrolcontroller.SetupAzureVNetLinkReconciler(
+		mgr,
+		azurevnetlinkclient.NewClientProvider(),
+		env,
+	); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "AzureVNetLink")
 		os.Exit(1)
 	}
 	//+kubebuilder:scaffold:builder

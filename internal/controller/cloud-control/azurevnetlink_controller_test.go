@@ -107,12 +107,12 @@ var _ = Describe("Feature: KCP AzureVNetLink", func() {
 
 	It("Scenario: KCP AzureVNetLink DNS private resolver is created and deleted", func() {
 		const (
-			kymaName                     = "755723ea-633b-4ec5-bfd5-02801a11d950"
-			kcpAzureVNetLinkName         = "386cd0d5-9f50-4e82-9fc6-d6d608d55a44"
-			remoteSubscription           = "0a931714-e36f-43f1-a28f-a0f43b477234"
-			remoteResourceGroup          = "MyResourceGroup"
-			remoteDnsForwardingRuleset   = "MyDnsForwardingRuleset"
-			remoteVirtualPrivateLinkName = "example-com"
+			kymaName                        = "755723ea-633b-4ec5-bfd5-02801a11d950"
+			kcpAzureVNetLinkName            = "386cd0d5-9f50-4e82-9fc6-d6d608d55a44"
+			remoteSubscription              = "0a931714-e36f-43f1-a28f-a0f43b477234"
+			remoteResourceGroup             = "MyResourceGroup"
+			remoteDnsPrivateResolverRuleset = "MyDnsForwardingRuleset"
+			remoteVirtualPrivateLinkName    = "example-com"
 		)
 
 		scope := &cloudcontrolv1beta1.Scope{}
@@ -129,7 +129,7 @@ var _ = Describe("Feature: KCP AzureVNetLink", func() {
 		azureMockRemote := infra.AzureMock().MockConfigs(remoteSubscription, scope.Spec.Scope.Azure.TenantId)
 
 		By("And Given that remote DNS private resolver ruleset exists", func() {
-			err := azureMockRemote.CreateDnsForwardingRuleset(infra.Ctx(), remoteResourceGroup, remoteDnsForwardingRuleset, map[string]string{kymaName: kymaName})
+			err := azureMockRemote.CreateDnsForwardingRuleset(infra.Ctx(), remoteResourceGroup, remoteDnsPrivateResolverRuleset, map[string]string{kymaName: kymaName})
 			Expect(err).NotTo(HaveOccurred())
 		})
 
@@ -138,7 +138,7 @@ var _ = Describe("Feature: KCP AzureVNetLink", func() {
 		By("When KCP AzureVnetLink is created", func() {
 			azureVNetLink = (&cloudcontrolv1beta1.AzureVNetLinkBuilder{}).
 				WithScope(kymaName).
-				WithRemoteDnsForwardingRuleset(azureutil.NewDnsForwardingRulesetResourceId(remoteSubscription, remoteResourceGroup, remoteDnsForwardingRuleset).String()).
+				WithRemoteDnsPrivateResolverRuleset(azureutil.NewDnsForwardingRulesetResourceId(remoteSubscription, remoteResourceGroup, remoteDnsPrivateResolverRuleset).String()).
 				WithRemoteVirtualPrivateLinkName(remoteVirtualPrivateLinkName).
 				Build()
 
@@ -151,7 +151,7 @@ var _ = Describe("Feature: KCP AzureVNetLink", func() {
 
 		By("And When DNS resolver VNetLink is provisioned", func() {
 			Eventually(azureMockRemote.SetDnsResolverVNetLinkProvisioned).
-				WithArguments(infra.Ctx(), remoteResourceGroup, remoteDnsForwardingRuleset, remoteVirtualPrivateLinkName).
+				WithArguments(infra.Ctx(), remoteResourceGroup, remoteDnsPrivateResolverRuleset, remoteVirtualPrivateLinkName).
 				Should(Succeed())
 		})
 
@@ -166,7 +166,7 @@ var _ = Describe("Feature: KCP AzureVNetLink", func() {
 		})
 
 		By("Then VirtualNetworkLink exist", func() {
-			link, err := azureMockRemote.GetDnsResolverVNetLink(infra.Ctx(), remoteResourceGroup, remoteDnsForwardingRuleset, remoteVirtualPrivateLinkName)
+			link, err := azureMockRemote.GetDnsResolverVNetLink(infra.Ctx(), remoteResourceGroup, remoteDnsPrivateResolverRuleset, remoteVirtualPrivateLinkName)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(link).NotTo(BeNil())
 		})
@@ -186,7 +186,7 @@ var _ = Describe("Feature: KCP AzureVNetLink", func() {
 		})
 
 		By("And Then VirtualNetworkLink does not exist", func() {
-			link, err := azureMockRemote.GetDnsResolverVNetLink(infra.Ctx(), remoteResourceGroup, remoteDnsForwardingRuleset, remoteVirtualPrivateLinkName)
+			link, err := azureMockRemote.GetDnsResolverVNetLink(infra.Ctx(), remoteResourceGroup, remoteDnsPrivateResolverRuleset, remoteVirtualPrivateLinkName)
 			Expect(err).To(HaveOccurred())
 			Expect(link).To(BeNil())
 		})

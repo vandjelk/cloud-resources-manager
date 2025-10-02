@@ -12,23 +12,23 @@ func initState(ctx context.Context, st composed.State) (error, context.Context) 
 	state := st.(*State)
 	logger := composed.LoggerFromCtx(ctx)
 
-	resourceId, err := azureutil.ParseResourceID(state.ObjAsAzureVNetLink().Spec.RemoteDnsForwardingRuleset)
+	resourceId, err := azureutil.ParseResourceID(state.ObjAsAzureVNetLink().Spec.RemoteDnsPrivateResolverRuleset)
 
 	if err == nil {
 		state.rulesetId = resourceId
 		return nil, ctx
 	}
 
-	logger.Error(err, "Error parsing RemoteDnsForwardingRuleset")
+	logger.Error(err, "Error parsing RemoteDnsPrivateResolverRuleset")
 
 	return composed.PatchStatus(state.ObjAsAzureVNetLink()).
 		SetExclusiveConditions(metav1.Condition{
 			Type:    cloudcontrolv1beta1.ConditionTypeError,
 			Status:  metav1.ConditionTrue,
 			Reason:  cloudcontrolv1beta1.ReasonValidationFailed,
-			Message: "Error parsing RemoteDnsForwardingRuleset",
+			Message: "Error parsing RemoteDnsPrivateResolverRuleset",
 		}).
-		ErrorLogMessage("Error patching KCP AzureVNetLink with error state after parsing RemoteDnsForwardingRuleset failed").
+		ErrorLogMessage("Error patching KCP AzureVNetLink with error state after parsing RemoteDnsPrivateResolverRuleset failed").
 		SuccessError(composed.StopAndForget).
 		Run(ctx, state)
 

@@ -19,8 +19,8 @@ func (b *AzureVNetLinkBuilder) WithRemotePrivateDnsZone(remotePrivateDnsZone str
 	return b
 }
 
-func (b *AzureVNetLinkBuilder) WithRemoteDnsForwardingRuleset(remoteDnsForwardingRuleset string) *AzureVNetLinkBuilder {
-	b.Obj.Spec.RemoteDnsForwardingRuleset = remoteDnsForwardingRuleset
+func (b *AzureVNetLinkBuilder) WithRemoteDnsPrivateResolverRuleset(remoteDnsPrivateResolverRuleset string) *AzureVNetLinkBuilder {
+	b.Obj.Spec.RemoteDnsPrivateResolverRuleset = remoteDnsPrivateResolverRuleset
 	return b
 }
 

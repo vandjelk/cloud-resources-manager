@@ -110,16 +110,25 @@ func (b *VpcPeeringBuilder) WithDetails(localName, localNamespace, remoteName, r
 }
 
 func (b *VpcPeeringBuilder) WithLocalPeeringName(localPeeringName string) *VpcPeeringBuilder {
+	if b.Obj.Spec.Details == nil {
+		b.Obj.Spec.Details = &VpcPeeringDetails{}
+	}
 	b.Obj.Spec.Details.LocalPeeringName = localPeeringName
 	return b
 }
 
 func (b *VpcPeeringBuilder) WithRemoteRouteTableUpdateStrategy(strategy AwsRouteTableUpdateStrategy) *VpcPeeringBuilder {
+	if b.Obj.Spec.Details == nil {
+		b.Obj.Spec.Details = &VpcPeeringDetails{}
+	}
 	b.Obj.Spec.Details.RemoteRouteTableUpdateStrategy = strategy
 	return b
 }
 
 func (b *VpcPeeringBuilder) WithUseRemoteGateway(useRemoteGateway bool) *VpcPeeringBuilder {
+	if b.Obj.Spec.Details == nil {
+		b.Obj.Spec.Details = &VpcPeeringDetails{}
+	}
 	b.Obj.Spec.Details.UseRemoteGateway = useRemoteGateway
 	return b
 }

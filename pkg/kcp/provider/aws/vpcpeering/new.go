@@ -29,6 +29,7 @@ func New(stateFactory StateFactory) composed.Action {
 			loadRemoteVpcPeeringConnection,
 			loadRemoteVpc,
 			loadRemoteRouteTables,
+			calculate,
 			composed.IfElse(
 				composed.MarkedForDeletionPredicate,
 				composed.ComposeActions(

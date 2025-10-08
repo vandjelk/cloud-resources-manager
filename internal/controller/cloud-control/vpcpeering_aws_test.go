@@ -1043,7 +1043,7 @@ var _ = Describe("Feature: KCP VpcPeering", func() {
 		})
 
 		By("When VpcPeering is ready", func() {
-			Eventually(LoadAndCheck, "2s").
+			Eventually(LoadAndCheck).
 				WithArguments(infra.Ctx(), infra.KCP().Client(), kcpPeering,
 					NewObjActions(),
 					HavingConditionTrue(cloudcontrolv1beta1.ConditionTypeReady)).

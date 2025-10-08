@@ -4,12 +4,9 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/aws/aws-sdk-go-v2/service/ec2/types"
-	"github.com/elliotchance/pie/v2"
 	cloudcontrolv1beta1 "github.com/kyma-project/cloud-manager/api/cloud-control/v1beta1"
 	"github.com/kyma-project/cloud-manager/pkg/composed"
 	awsmeta "github.com/kyma-project/cloud-manager/pkg/kcp/provider/aws/meta"
-	awsutil "github.com/kyma-project/cloud-manager/pkg/kcp/provider/aws/util"
 	"github.com/kyma-project/cloud-manager/pkg/util"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -20,36 +17,13 @@ func createRemoteRoutes(ctx context.Context, st composed.State) (error, context.
 	state := st.(*State)
 	logger := composed.LoggerFromCtx(ctx)
 
-	if awsutil.IsRouteTableUpdateStrategyNone(state.ObjAsVpcPeering().Spec.Details.RemoteRouteTableUpdateStrategy) {
-		return nil, nil
-	}
-
-	for _, t := range state.remoteRouteTables {
-
-		shouldUpdateRouteTable := awsutil.ShouldUpdateRouteTable(t.Tags,
-			state.ObjAsVpcPeering().Spec.Details.RemoteRouteTableUpdateStrategy,
-			state.Scope().Spec.ShootName)
-
-		cidrBlock := state.vpc.CidrBlock
-
-		routeExists := pie.Any(t.Routes, func(r types.Route) bool {
-			return ptr.Equal(r.VpcPeeringConnectionId, state.vpcPeering.VpcPeeringConnectionId) &&
-				ptr.Equal(r.DestinationCidrBlock, cidrBlock)
-		})
-
+	for _, rx := range state.remoteRoutesToCreate {
 		lll := logger.WithValues(
-			"remoteRouteTableId", ptr.Deref(t.RouteTableId, "xxx"),
-			"destinationCidrBlock", ptr.Deref(cidrBlock, "xxx"))
+			"remoteRouteTableId", ptr.Deref(rx.RouteTableId, "xxx"),
+			"destinationCidrBlock", ptr.Deref(rx.DestinationCidrBlock, "xxx"))
 
-		if routeExists {
-			continue
-		}
+		err := state.remoteClient.CreateRoute(ctx, rx.RouteTableId, rx.DestinationCidrBlock, state.vpcPeering.VpcPeeringConnectionId)
 
-		if !shouldUpdateRouteTable {
-			continue
-		}
-
-		err := state.remoteClient.CreateRoute(ctx, t.RouteTableId, cidrBlock, state.vpcPeering.VpcPeeringConnectionId)
 		if err == nil {
 			lll.Info("Remote route created")
 			continue
@@ -58,7 +32,7 @@ func createRemoteRoutes(ctx context.Context, st composed.State) (error, context.
 		lll.Error(err, "Error creating remote route")
 
 		if awsmeta.IsErrorRetryable(err) {
-			return composed.StopWithRequeueDelay(util.Timing.T10000ms()), nil
+			return composed.StopWithRequeueDelay(util.Timing.T10000ms()), ctx
 		}
 
 		successError := composed.StopWithRequeueDelay(util.Timing.T60000ms())
@@ -74,7 +48,7 @@ func createRemoteRoutes(ctx context.Context, st composed.State) (error, context.
 			Type:    cloudcontrolv1beta1.ConditionTypeError,
 			Status:  metav1.ConditionTrue,
 			Reason:  cloudcontrolv1beta1.ReasonFailedCreatingRoutes,
-			Message: fmt.Sprintf("Failed updating routes for remote route table %s. %s", ptr.Deref(t.RouteTableId, ""), msg),
+			Message: fmt.Sprintf("Failed updating routes for remote route table %s. %s", ptr.Deref(rx.RouteTableId, ""), msg),
 		}) {
 			changed = true
 		}
@@ -84,9 +58,9 @@ func createRemoteRoutes(ctx context.Context, st composed.State) (error, context.
 			changed = true
 		}
 
-		// Do not update status if nothing is changed
+		// Do not update the status if nothing is changed
 		if !changed {
-			return successError, nil
+			return successError, ctx
 		}
 
 		// User can recover by modifying routes
@@ -97,5 +71,5 @@ func createRemoteRoutes(ctx context.Context, st composed.State) (error, context.
 
 	}
 
-	return nil, nil
+	return nil, ctx
 }

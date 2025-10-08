@@ -10,8 +10,9 @@ import (
 	aws "github.com/kyma-project/cloud-manager/pkg/kcp/provider/aws/vpcpeering"
 	azure "github.com/kyma-project/cloud-manager/pkg/kcp/provider/azure/vpcpeering"
 	gcp "github.com/kyma-project/cloud-manager/pkg/kcp/provider/gcp/vpcpeering"
+	"github.com/kyma-project/cloud-manager/pkg/kcp/vpcpeering/types"
 	"github.com/kyma-project/cloud-manager/pkg/util"
-	"k8s.io/apimachinery/pkg/types"
+	corev1 "k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
@@ -58,7 +59,7 @@ func (r *vpcPeeringReconciler) Reconcile(ctx context.Context, request reconcile.
 		Handle(action(ctx, state))
 }
 
-func (r *vpcPeeringReconciler) newFocalState(name types.NamespacedName) focal.State {
+func (r *vpcPeeringReconciler) newFocalState(name corev1.NamespacedName) focal.State {
 	return r.focalStateFactory.NewState(
 		r.composedStateFactory.NewState(name, &cloudcontrolv1beta1.VpcPeering{}),
 	)
@@ -83,7 +84,7 @@ func (r *vpcPeeringReconciler) newAction() composed.Action {
 					composed.NewCase(statewithscope.AzureProviderPredicate, azure.New(r.azureStateFactory)),
 					composed.NewCase(statewithscope.GcpProviderPredicate, gcp.New(r.gcpStateFactory)),
 				),
-			)(ctx, newState(st.(focal.State)))
+			)(ctx, types.NewState(st.(focal.State)))
 		},
 	)
 }

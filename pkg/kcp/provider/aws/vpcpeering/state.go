@@ -29,6 +29,27 @@ type State struct {
 
 	routeTables       []ec2types.RouteTable
 	remoteRouteTables []ec2types.RouteTable
+
+	hasShootTag          bool
+	localPeeringCreate   bool
+	localPeeringDelete   bool
+	localTerminating     bool
+	localRoutesToCreate  []route
+	localRoutesToDelete  []route
+	localInitiating      bool
+	localActive          bool
+	remotePeeringAccept  bool
+	remotePeeringDelete  bool
+	remoteTerminating    bool
+	remoteRoutesToCreate []route
+	remoteRoutesToDelete []route
+	localStatusIdEmpty   bool
+	remoteStatusIdEmpty  bool
+}
+
+type route struct {
+	RouteTableId         *string
+	DestinationCidrBlock *string
 }
 
 type StateFactory interface {

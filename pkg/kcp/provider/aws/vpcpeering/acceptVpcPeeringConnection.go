@@ -15,8 +15,8 @@ func acceptVpcPeeringConnection(ctx context.Context, st composed.State) (error, 
 	state := st.(*State)
 	logger := composed.LoggerFromCtx(ctx)
 
-	if state.remoteVpcPeering != nil {
-		return nil, nil
+	if !state.remotePeeringAccept {
+		return nil, ctx
 	}
 
 	peering, err := state.remoteClient.AcceptVpcPeeringConnection(ctx, state.vpcPeering.VpcPeeringConnectionId)

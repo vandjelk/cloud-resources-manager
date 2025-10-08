@@ -4,7 +4,6 @@ import (
 	"context"
 	"github.com/kyma-project/cloud-manager/pkg/composed"
 	awsmeta "github.com/kyma-project/cloud-manager/pkg/kcp/provider/aws/meta"
-	awsutil "github.com/kyma-project/cloud-manager/pkg/kcp/provider/aws/util"
 	"github.com/kyma-project/cloud-manager/pkg/util"
 	"k8s.io/utils/ptr"
 )
@@ -14,22 +13,24 @@ func remotePeeringDelete(ctx context.Context, st composed.State) (error, context
 	logger := composed.LoggerFromCtx(ctx)
 
 	if !state.ObjAsVpcPeering().Spec.Details.DeleteRemotePeering {
+		logger.Info("Skipping remote peering deletion")
 		return nil, ctx
 	}
 
 	if state.remoteVpcPeering == nil {
-		logger.Info("Remote AWS VPC peering not loaded on deleting VpcPeering")
-		return nil, ctx
-	}
-
-	if awsutil.IsTerminated(state.remoteVpcPeering) {
-		logger.Info("Remote VpcPeering can't be deleted at this stage",
+		logger.Info("Remote peering not loaded on deleting VpcPeering")
+	} else if state.localTerminating {
+		logger.Info("Remote peering can't be deleted at this stage",
 			"peeringStatusCode", string(state.remoteVpcPeering.Status.Code),
 			"peeringStatusMessage", ptr.Deref(state.remoteVpcPeering.Status.Message, ""))
+	}
+
+	if !state.remotePeeringDelete {
+		logger.Info("Remote peering can't be deleted since it is not loaded or terminating")
 		return nil, ctx
 	}
 
-	logger.Info("Deleting remote VpcPeering")
+	logger.Info("Deleting remote peering")
 
 	err := state.remoteClient.DeleteVpcPeeringConnection(ctx, state.remoteVpcPeering.VpcPeeringConnectionId)
 
@@ -41,7 +42,7 @@ func remotePeeringDelete(ctx context.Context, st composed.State) (error, context
 		return composed.LogErrorAndReturn(err, "Error deleting remote peering", nil, ctx)
 	}
 
-	logger.Info("Remote VpcPeering deleted")
+	logger.Info("Remote peering deleted")
 
 	return nil, ctx
 }

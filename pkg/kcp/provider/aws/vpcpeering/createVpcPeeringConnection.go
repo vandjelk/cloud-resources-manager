@@ -19,8 +19,8 @@ func createVpcPeeringConnection(ctx context.Context, st composed.State) (error, 
 	state := st.(*State)
 	logger := composed.LoggerFromCtx(ctx)
 
-	if state.vpcPeering != nil {
-		return nil, nil
+	if !state.localPeeringCreate {
+		return nil, ctx
 	}
 
 	tags := []ec2types.Tag{
@@ -57,7 +57,7 @@ func createVpcPeeringConnection(ctx context.Context, st composed.State) (error, 
 		tags)
 
 	if err != nil {
-		logger.Error(err, "Error creating AWS VPC Peering")
+		logger.Error(err, "Error creating VPC peering")
 
 		if awsmeta.IsErrorRetryable(err) {
 			return composed.StopWithRequeueDelay(util.Timing.T10000ms()), nil
@@ -88,7 +88,7 @@ func createVpcPeeringConnection(ctx context.Context, st composed.State) (error, 
 		}
 
 		return composed.PatchStatus(state.ObjAsVpcPeering()).
-			ErrorLogMessage("Error updating VpcPeering status due to failed creating vpc peering connection").
+			ErrorLogMessage("Error updating VpcPeering status due to failed creating VPC peering connection").
 			FailedError(composed.StopWithRequeue).
 			SuccessError(composed.StopWithRequeueDelay(util.Timing.T60000ms())).
 			Run(ctx, state)
@@ -98,7 +98,7 @@ func createVpcPeeringConnection(ctx context.Context, st composed.State) (error, 
 
 	ctx = composed.LoggerIntoCtx(ctx, logger)
 
-	logger.Info("AWS VPC Peering Connection created")
+	logger.Info("VPC peering created")
 
 	state.vpcPeering = vpcPeering
 
@@ -106,7 +106,7 @@ func createVpcPeeringConnection(ctx context.Context, st composed.State) (error, 
 	state.ObjAsVpcPeering().Status.VpcId = ptr.Deref(state.vpc.VpcId, "")
 
 	return composed.PatchStatus(state.ObjAsVpcPeering()).
-		ErrorLogMessage("Error updating VPC Peering status with connection id").
+		ErrorLogMessage("Error updating VpcPeering status with peering connection id").
 		FailedError(composed.StopWithRequeue).
 		SuccessErrorNil().
 		Run(ctx, state)

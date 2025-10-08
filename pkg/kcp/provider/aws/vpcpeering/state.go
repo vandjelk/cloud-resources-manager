@@ -33,6 +33,27 @@ type State struct {
 
 	localNetwork  *cloudcontrolv1beta1.Network
 	remoteNetwork *cloudcontrolv1beta1.Network
+
+	hasShootTag          bool
+	localPeeringCreate   bool
+	localPeeringDelete   bool
+	localTerminating     bool
+	localRoutesToCreate  []route
+	localRoutesToDelete  []route
+	localInitiating      bool
+	localActive          bool
+	remotePeeringAccept  bool
+	remotePeeringDelete  bool
+	remoteTerminating    bool
+	remoteRoutesToCreate []route
+	remoteRoutesToDelete []route
+	localStatusIdEmpty   bool
+	remoteStatusIdEmpty  bool
+}
+
+type route struct {
+	RouteTableId         *string
+	DestinationCidrBlock *string
 }
 
 type StateFactory interface {

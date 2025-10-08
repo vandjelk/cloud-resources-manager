@@ -9,3 +9,15 @@ type State interface {
 	focal.State
 	ObjAsVpcPeering() *v1beta1.VpcPeering
 }
+
+type state struct {
+	focal.State
+}
+
+func (s *state) ObjAsVpcPeering() *v1beta1.VpcPeering {
+	return s.Obj().(*v1beta1.VpcPeering)
+}
+
+func NewState(focalState focal.State) State {
+	return &state{State: focalState}
+}

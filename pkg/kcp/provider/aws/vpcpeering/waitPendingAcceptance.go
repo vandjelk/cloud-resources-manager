@@ -3,10 +3,8 @@ package vpcpeering
 import (
 	"context"
 	"fmt"
-	ec2types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
 	cloudcontrolv1beta1 "github.com/kyma-project/cloud-manager/api/cloud-control/v1beta1"
 	"github.com/kyma-project/cloud-manager/pkg/composed"
-	awsutil "github.com/kyma-project/cloud-manager/pkg/kcp/provider/aws/util"
 	"github.com/kyma-project/cloud-manager/pkg/util"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -18,12 +16,12 @@ func waitPendingAcceptance(ctx context.Context, st composed.State) (error, conte
 
 	code := state.vpcPeering.Status.Code
 
-	if code == ec2types.VpcPeeringConnectionStateReasonCodeInitiatingRequest {
+	if state.localInitiating {
 		return composed.StopWithRequeueDelay(util.Timing.T1000ms()), nil
 	}
 
 	// can't continue if VPC peering connection is in one of these statuses
-	if awsutil.IsTerminatedOrDeleting(state.vpcPeering) {
+	if state.localTerminating {
 		changed := false
 
 		if state.ObjAsVpcPeering().Status.State != string(code) {

@@ -2,11 +2,8 @@ package vpcpeering
 
 import (
 	"context"
-	"github.com/aws/aws-sdk-go-v2/service/ec2/types"
-	"github.com/elliotchance/pie/v2"
 	cloudcontrolv1beta1 "github.com/kyma-project/cloud-manager/api/cloud-control/v1beta1"
 	"github.com/kyma-project/cloud-manager/pkg/composed"
-	"github.com/kyma-project/cloud-manager/pkg/feature"
 	awsmeta "github.com/kyma-project/cloud-manager/pkg/kcp/provider/aws/meta"
 	"github.com/kyma-project/cloud-manager/pkg/util"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -20,102 +17,74 @@ func createRoutes(ctx context.Context, st composed.State) (error, context.Contex
 	logger := composed.LoggerFromCtx(ctx)
 	obj := state.ObjAsVpcPeering()
 
-	for _, t := range state.routeTables {
+	for _, rx := range state.localRoutesToCreate {
+		lll := logger.WithValues(
+			"routeTableId", ptr.Deref(rx.RouteTableId, "xxx"),
+			"destinationCidrBlock", ptr.Deref(rx.DestinationCidrBlock, "xxx"))
 
-		for _, cidrBlockAssociation := range state.remoteVpc.CidrBlockAssociationSet {
+		err := state.client.CreateRoute(ctx, rx.RouteTableId, rx.DestinationCidrBlock, state.remoteVpcPeering.VpcPeeringConnectionId)
 
-			cidrBlock := cidrBlockAssociation.CidrBlock
-
-			routeExists := pie.Any(t.Routes, func(r types.Route) bool {
-				return ptr.Equal(r.VpcPeeringConnectionId, state.vpcPeering.VpcPeeringConnectionId) &&
-					ptr.Equal(r.DestinationCidrBlock, cidrBlock)
-			})
-
-			if routeExists {
-				continue
-			}
-
-			lll := logger.WithValues(
-				"routeTableId", ptr.Deref(t.RouteTableId, "xxx"),
-				"destinationCidrBlock", ptr.Deref(cidrBlock, "xxx"))
-
-			err := state.client.CreateRoute(ctx, t.RouteTableId, cidrBlock, state.remoteVpcPeering.VpcPeeringConnectionId)
-
-			if err == nil {
-				lll.Info("Route created")
-				continue
-			}
-
-			lll.Error(err, "Error creating route")
-
-			if awsmeta.IsErrorRetryable(err) {
-				return composed.StopWithRequeueDelay(util.Timing.T10000ms()), ctx
-			}
-
-			changed := false
-			if meta.RemoveStatusCondition(obj.Conditions(), cloudcontrolv1beta1.ConditionTypeReady) {
-				changed = true
-			}
-
-			if meta.SetStatusCondition(obj.Conditions(), metav1.Condition{
-				Type:    cloudcontrolv1beta1.ConditionTypeError,
-				Status:  metav1.ConditionTrue,
-				Reason:  cloudcontrolv1beta1.ReasonFailedCreatingRoutes,
-				Message: "Failed creating route for local route table",
-			}) {
-				changed = true
-			}
-
-			if obj.Status.State != string(cloudcontrolv1beta1.StateError) {
-				obj.Status.State = string(cloudcontrolv1beta1.StateError)
-				changed = true
-			}
-
-			if changed {
-				// User can not recover from internal error
-				return composed.PatchStatus(obj).
-					ErrorLogMessage("Error updating VpcPeering status when creating local routes").
-					SuccessError(composed.StopAndForget).
-					Run(ctx, state)
-			}
-
-			// prevents alternating error messages
-			return composed.StopAndForget, ctx
-		}
-
-		if !feature.VpcPeeringSync.Value(ctx) {
+		if err == nil {
+			lll.Info("Route created")
 			continue
 		}
 
-		peeringRoutes := pie.Filter(t.Routes, func(r types.Route) bool {
-			return ptr.Equal(r.VpcPeeringConnectionId, state.vpcPeering.VpcPeeringConnectionId)
-		})
+		lll.Error(err, "Error creating route")
 
-		for _, r := range peeringRoutes {
-			exists := pie.Any(state.remoteVpc.CidrBlockAssociationSet, func(a types.VpcCidrBlockAssociation) bool {
-				return ptr.Equal(a.CidrBlock, r.DestinationCidrBlock)
-			})
-
-			if !exists {
-				err := state.client.DeleteRoute(ctx, t.RouteTableId, r.DestinationCidrBlock)
-
-				if awsmeta.IsErrorRetryable(err) {
-					return composed.StopWithRequeueDelay(util.Timing.T10000ms()), ctx
-				}
-
-				lll := logger.WithValues(
-					"routeTableId", ptr.Deref(t.RouteTableId, "xxx"),
-					"destinationCidrBlock", ptr.Deref(r.DestinationCidrBlock, "xxx"),
-				)
-
-				if err != nil {
-					lll.Error(err, "Error deleting orphan route")
-					return composed.StopWithRequeueDelay(util.Timing.T60000ms()), ctx
-				}
-
-				lll.Info("Orphan route deleted")
-			}
+		if awsmeta.IsErrorRetryable(err) {
+			return composed.StopWithRequeueDelay(util.Timing.T10000ms()), ctx
 		}
+
+		changed := false
+		if meta.RemoveStatusCondition(obj.Conditions(), cloudcontrolv1beta1.ConditionTypeReady) {
+			changed = true
+		}
+
+		if meta.SetStatusCondition(obj.Conditions(), metav1.Condition{
+			Type:    cloudcontrolv1beta1.ConditionTypeError,
+			Status:  metav1.ConditionTrue,
+			Reason:  cloudcontrolv1beta1.ReasonFailedCreatingRoutes,
+			Message: "Failed creating route for local route table",
+		}) {
+			changed = true
+		}
+
+		if obj.Status.State != string(cloudcontrolv1beta1.StateError) {
+			obj.Status.State = string(cloudcontrolv1beta1.StateError)
+			changed = true
+		}
+
+		if changed {
+			// User cannot recover from internal error
+			return composed.PatchStatus(obj).
+				ErrorLogMessage("Error updating VpcPeering status when creating local routes").
+				SuccessError(composed.StopAndForget).
+				Run(ctx, state)
+		}
+
+		// prevents alternating error messages
+		return composed.StopAndForget, ctx
+	}
+
+	for _, rx := range state.localRoutesToDelete {
+		err := state.client.DeleteRoute(ctx, rx.RouteTableId, rx.DestinationCidrBlock)
+
+		if awsmeta.IsErrorRetryable(err) {
+			return composed.StopWithRequeueDelay(util.Timing.T10000ms()), ctx
+		}
+
+		lll := logger.WithValues(
+			"routeTableId", ptr.Deref(rx.RouteTableId, "xxx"),
+			"destinationCidrBlock", ptr.Deref(rx.DestinationCidrBlock, "xxx"),
+		)
+
+		if err != nil {
+			lll.Error(err, "Error deleting orphan route")
+			return composed.StopWithRequeueDelay(util.Timing.T60000ms()), ctx
+		}
+
+		lll.Info("Orphan route deleted")
+
 	}
 
 	return nil, ctx

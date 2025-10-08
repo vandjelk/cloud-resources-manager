@@ -4,7 +4,6 @@ import (
 	"context"
 	"github.com/kyma-project/cloud-manager/pkg/composed"
 	awsmeta "github.com/kyma-project/cloud-manager/pkg/kcp/provider/aws/meta"
-	awsutil "github.com/kyma-project/cloud-manager/pkg/kcp/provider/aws/util"
 	"github.com/kyma-project/cloud-manager/pkg/util"
 	"k8s.io/utils/ptr"
 )
@@ -14,14 +13,15 @@ func deleteVpcPeering(ctx context.Context, st composed.State) (error, context.Co
 	logger := composed.LoggerFromCtx(ctx)
 
 	if state.vpcPeering == nil {
-		logger.Info("Local AWS VPC peering not loaded on deleting VpcPeering")
-		return nil, ctx
-	}
-
-	if awsutil.IsTerminated(state.vpcPeering) {
-		logger.Info("VpcPeering can't be deleted at this stage",
+		logger.Info("Local peering not loaded on deleting VpcPeering")
+	} else if state.localTerminating {
+		logger.Info("Local peering can't be deleted at this stage",
 			"peeringStatusCode", string(state.vpcPeering.Status.Code),
 			"peeringStatusMessage", ptr.Deref(state.vpcPeering.Status.Message, ""))
+	}
+
+	if !state.localPeeringDelete {
+		logger.Info("Local peering can't be deleted since it's not loaded or terminating")
 		return nil, ctx
 	}
 

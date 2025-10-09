@@ -58,8 +58,17 @@ func TestCreateNoNetworkTag(t *testing.T) {
 	assert.False(t, s.localPeeringCreate)
 	assert.False(t, s.localInitiating)
 	assert.False(t, s.localTerminating)
-	assert.False(t, s.remotePeeringAccept)
 	assert.False(t, s.localActive)
+	assert.Nil(t, s.localRoutesToCreate)
+	assert.Nil(t, s.localRoutesToDelete)
+	assert.False(t, s.localStatusIdEmpty)
+	assert.False(t, s.remotePeeringAccept)
+	assert.False(t, s.remoteTerminating)
+	assert.Nil(t, s.remoteRoutesToCreate)
+	assert.Nil(t, s.remoteRoutesToDelete)
+	assert.False(t, s.remoteStatusIdEmpty)
+	assert.False(t, s.localPeeringDelete)
+	assert.False(t, s.remotePeeringDelete)
 }
 
 func TestCreate(t *testing.T) {
@@ -79,8 +88,17 @@ func TestCreate(t *testing.T) {
 	assert.True(t, s.localPeeringCreate)
 	assert.False(t, s.localInitiating)
 	assert.False(t, s.localTerminating)
-	assert.False(t, s.remotePeeringAccept)
 	assert.False(t, s.localActive)
+	assert.Nil(t, s.localRoutesToCreate)
+	assert.Nil(t, s.localRoutesToDelete)
+	assert.False(t, s.localStatusIdEmpty)
+	assert.False(t, s.remotePeeringAccept)
+	assert.False(t, s.remoteTerminating)
+	assert.Nil(t, s.remoteRoutesToCreate)
+	assert.Nil(t, s.remoteRoutesToDelete)
+	assert.False(t, s.remoteStatusIdEmpty)
+	assert.False(t, s.localPeeringDelete)
+	assert.False(t, s.remotePeeringDelete)
 }
 
 func TestInitiating(t *testing.T) {
@@ -107,8 +125,17 @@ func TestInitiating(t *testing.T) {
 	assert.False(t, s.localPeeringCreate)
 	assert.True(t, s.localInitiating)
 	assert.False(t, s.localTerminating)
-	assert.False(t, s.remotePeeringAccept)
 	assert.False(t, s.localActive)
+	assert.Nil(t, s.localRoutesToCreate)
+	assert.Nil(t, s.localRoutesToDelete)
+	assert.False(t, s.localStatusIdEmpty)
+	assert.False(t, s.remotePeeringAccept)
+	assert.False(t, s.remoteTerminating)
+	assert.Nil(t, s.remoteRoutesToCreate)
+	assert.Nil(t, s.remoteRoutesToDelete)
+	assert.False(t, s.remoteStatusIdEmpty)
+	assert.False(t, s.localPeeringDelete)
+	assert.False(t, s.remotePeeringDelete)
 }
 
 func TestAccept(t *testing.T) {
@@ -135,8 +162,17 @@ func TestAccept(t *testing.T) {
 	assert.False(t, s.localPeeringCreate)
 	assert.False(t, s.localInitiating)
 	assert.False(t, s.localTerminating)
-	assert.True(t, s.remotePeeringAccept)
 	assert.False(t, s.localActive)
+	assert.Nil(t, s.localRoutesToCreate)
+	assert.Nil(t, s.localRoutesToDelete)
+	assert.False(t, s.localStatusIdEmpty)
+	assert.True(t, s.remotePeeringAccept)
+	assert.False(t, s.remoteTerminating)
+	assert.Nil(t, s.remoteRoutesToCreate)
+	assert.Nil(t, s.remoteRoutesToDelete)
+	assert.False(t, s.remoteStatusIdEmpty)
+	assert.False(t, s.localPeeringDelete)
+	assert.False(t, s.remotePeeringDelete)
 }
 
 func TestActive(t *testing.T) {

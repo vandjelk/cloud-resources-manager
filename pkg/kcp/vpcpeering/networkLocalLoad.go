@@ -3,9 +3,11 @@ package vpcpeering
 import (
 	"context"
 	"fmt"
+	"github.com/kyma-project/cloud-manager/pkg/kcp/vpcpeering/types"
 	"k8s.io/apimachinery/pkg/api/meta"
 
 	cloudcontrolv1beta1 "github.com/kyma-project/cloud-manager/api/cloud-control/v1beta1"
+
 	"github.com/kyma-project/cloud-manager/pkg/composed"
 	"github.com/kyma-project/cloud-manager/pkg/util"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -14,7 +16,8 @@ import (
 )
 
 func kcpNetworkLocalLoad(ctx context.Context, st composed.State) (error, context.Context) {
-	state := st.(*State)
+	state := st.(types.State)
+
 	logger := composed.LoggerFromCtx(ctx)
 
 	net := &cloudcontrolv1beta1.Network{}
@@ -67,7 +70,7 @@ func kcpNetworkLocalLoad(ctx context.Context, st composed.State) (error, context
 			Run(ctx, state)
 	}
 
-	state.localNetwork = net
+	state.SetLocalNetwork(net)
 
 	return nil, ctx
 }

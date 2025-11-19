@@ -2,6 +2,7 @@ package vpcpeering
 
 import (
 	"context"
+	"github.com/kyma-project/cloud-manager/pkg/kcp/vpcpeering/types"
 	"k8s.io/apimachinery/pkg/api/meta"
 
 	cloudcontrolv1beta1 "github.com/kyma-project/cloud-manager/api/cloud-control/v1beta1"
@@ -11,18 +12,18 @@ import (
 )
 
 func kcpNetworkRemoteWait(ctx context.Context, st composed.State) (error, context.Context) {
-	state := st.(*State)
+	state := st.(types.State)
 	logger := composed.LoggerFromCtx(ctx)
 
 	if composed.IsMarkedForDeletion(state.Obj()) {
 		return nil, ctx
 	}
 
-	if meta.IsStatusConditionTrue(state.remoteNetwork.Status.Conditions, cloudcontrolv1beta1.ConditionTypeReady) {
+	if meta.IsStatusConditionTrue(state.RemoteNetwork().Status.Conditions, cloudcontrolv1beta1.ConditionTypeReady) {
 		return nil, ctx
 	}
 
-	if meta.IsStatusConditionTrue(state.remoteNetwork.Status.Conditions, cloudcontrolv1beta1.ConditionTypeError) {
+	if meta.IsStatusConditionTrue(state.RemoteNetwork().Status.Conditions, cloudcontrolv1beta1.ConditionTypeError) {
 		changed := false
 
 		if meta.RemoveStatusCondition(state.ObjAsVpcPeering().Conditions(), cloudcontrolv1beta1.ConditionTypeReady) {

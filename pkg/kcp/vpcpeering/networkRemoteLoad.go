@@ -3,6 +3,7 @@ package vpcpeering
 import (
 	"context"
 	"fmt"
+	"github.com/kyma-project/cloud-manager/pkg/kcp/vpcpeering/types"
 	"k8s.io/apimachinery/pkg/api/meta"
 
 	cloudcontrolv1beta1 "github.com/kyma-project/cloud-manager/api/cloud-control/v1beta1"
@@ -14,7 +15,7 @@ import (
 )
 
 func kcpNetworkRemoteLoad(ctx context.Context, st composed.State) (error, context.Context) {
-	state := st.(*State)
+	state := st.(types.State)
 	logger := composed.LoggerFromCtx(ctx)
 
 	net := &cloudcontrolv1beta1.Network{}
@@ -67,7 +68,7 @@ func kcpNetworkRemoteLoad(ctx context.Context, st composed.State) (error, contex
 			Run(ctx, state)
 	}
 
-	state.remoteNetwork = net
+	state.SetRemoteNetwork(net)
 
 	return nil, ctx
 }

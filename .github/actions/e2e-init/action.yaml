@@ -1,0 +1,123 @@
+name: E2E Init Action
+description: Initializes the environment for E2E tests
+runs:
+  using: composite
+  steps:
+    - name: Setup Go
+      uses: actions/setup-go@v5
+      with:
+        go-version-file: 'go.mod'
+    - name: Setup OpenTofu
+      uses: opentofu/setup-opentofu@v1
+    - name: Display Go version
+      shell: bash
+      run: go version
+    - name: Write KUBECONFIG to file
+      shell: bash
+      run: |
+        echo "$GARDENER_KUBECONFIG" > kubeconfig-garden.yaml
+    - name: Write e2e config file
+      shell: bash
+      run: |
+        cat <<EOF > e2e-config.yaml
+        gardenKubeconfig: $PWD/kubeconfig-garden.yaml
+        shootPrefix: pp
+        kcpNamespace: kcp-system
+        gardenNamespace: garden-spm-test01
+        skrNamespace: default
+        subscriptions:
+          - name: my-aws-secret
+            provider: aws
+            isDefault: true
+          - name: svc-btp-kyma-phoenix-dev
+            provider: azure
+            isDefault: true
+          - name: gardener-sc-learn
+            provider: gcp
+            isDefault: true
+        networkOwner: gardener
+        oidcClientId: $OIDC_CLIENT_ID
+        oidcIssuerUrl: $OIDC_ISSUER_URL
+        administrators:
+          - vladimir.andjelkoski@sap.com
+          - dl_623b719a6a0d2d029907bee0@global.corp.sap
+        overwriteGardenerCredentials: true
+        downloadGardenSecrets:
+          cm-e2e-default-aws:
+            AWS_ACCESS_KEY_ID: accessKeyID
+            AWS_SECRET_ACCESS_KEY: secretAccessKey
+          cm-e2e-peering-aws:
+            AWS_PEERING_ACCESS_KEY_ID: accessKeyID
+            AWS_PEERING_SECRET_ACCESS_KEY: secretAccessKey
+          cm-e2e-default-gcp:
+            "gcp-default.json": serviceaccount.json
+          cm-e2e-peering-gcp:
+            "gcp-peering.json": serviceaccount.json
+          svc-btp-kyma-phoenix-dev:
+            AZURE_CLIENT_ID: clientID
+            AZURE_CLIENT_SECRET: clientSecret
+            AZURE_PEERING_CLIENT_ID: clientID
+            AZURE_PEERING_CLIENT_SECRET: clientSecret
+
+        EOF
+    - name: Display e2e config file
+      shell: bash
+      run: cat e2e-config.yaml
+    - name: Create tmp directory
+      shell: bash
+      run: mkdir ./tmp
+    - name: List directory
+      shell: bash
+      run: ls -la
+    - name: Download credentials
+      shell: bash
+      run: go run ./e2e/cmd credentials download
+    - name: List tmp directory
+      shell: bash
+      run: ls -la ./tmp
+    - name: Download setup-envtest
+      shell: bash
+      run: make envtest
+    - name: Get ENVTEST_K8S_VERSION from Makefile
+      shell: bash
+      run: |
+        ENVTEST_K8S_VERSION=$(grep "ENVTEST_K8S_VERSION = " Makefile | awk -F '[[:space:]]*=[[:space:]]*' '{print $2}')
+        echo "ENVTEST_K8S_VERSION is $ENVTEST_K8S_VERSION"
+        echo "ENVTEST_K8S_VERSION=$ENVTEST_K8S_VERSION" >> $GITHUB_ENV
+    - name: Setup envtest
+      shell: bash
+      run: |
+        ./bin/setup-envtest use $ENVTEST_K8S_VERSION --bin-dir $PWD/bin -p path
+    - name: Run envtest
+      shell: bash
+      run: |
+        go run ./e2e/cmd envtest run -v $ENVTEST_K8S_VERSION -o ./tmp/kubeconfig-kcp.yaml > ./tmp/envtest.log 2>&1 &
+        ENVTEST_PID=$!
+        echo "ENVTEST_PID=$ENVTEST_PID" >> "$GITHUB_ENV"
+        echo "Waiting for envtest to start K8S cluster"
+        sleep 30
+    - name: List tmp directory after K8S start
+      shell: bash
+      run: ls -la ./tmp
+    - name: Run sim
+      shell: bash
+      env:
+        KUBECONFIG: ./tmp/kubeconfig-kcp.yaml
+      run: |
+        go run ./e2e/cmd sim run  > ./tmp/sim.log 2>&1 &
+        SIM_PID=$!
+        echo "SIM_PID=$SIM_PID" >> "$GITHUB_ENV"
+        echo "Waiting for sim to start"
+        sleep 30
+    - name: Run Cloud Manager
+      shell: bash
+      env:
+        KUBECONFIG: ./tmp/kubeconfig-kcp.yaml
+        GCP_VPC_PEERING_KEY_PATH: ./tmp/gcp-peering.json
+        GCP_SA_JSON_KEY_PATH: ./tmp/gcp-default.json
+        LANDSCAPE: dev
+        PEERING_NETWORK_TAG: e2e
+      run: |
+        go run ./cmd > ./tmp/cloud-manager.log 2>&1 &
+        CLOUD_MANAGER_PID=$!
+        echo "CLOUD_MANAGER_PID=$CLOUD_MANAGER_PID" >> "$GITHUB_ENV"

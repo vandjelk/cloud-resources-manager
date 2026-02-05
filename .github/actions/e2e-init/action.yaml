@@ -60,11 +60,9 @@ runs:
           cm-e2e-default-aws:
             AWS_ACCESS_KEY_ID: accessKeyID
             AWS_SECRET_ACCESS_KEY: secretAccessKey
-            AWS_ROLE_NAME: CloudManagerRole
           cm-e2e-peering-aws:
             AWS_PEERING_ACCESS_KEY_ID: accessKeyID
             AWS_PEERING_SECRET_ACCESS_KEY: secretAccessKey
-            AWS_PEERING_ROLE_NAME: CloudManagerPeeringRole
           cm-e2e-default-gcp:
             "gcp-default.json": serviceaccount.json
           cm-e2e-peering-gcp:
@@ -88,6 +86,11 @@ runs:
     - name: Download credentials
       shell: bash
       run: go run ./e2e/cmd credentials download
+    - name: Write hardcoded AWS IAM role names
+      shell: bash
+      run: |
+        echo "CloudManagerRole" > ./tmp/AWS_ROLE_NAME
+        echo "CloudManagerPeeringRole" > ./tmp/AWS_PEERING_ROLE_NAME
     - name: List tmp directory
       shell: bash
       run: ls -la ./tmp

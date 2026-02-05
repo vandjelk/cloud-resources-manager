@@ -16,10 +16,10 @@ inputs:
     default: './pkg/feature/ff_edge.yaml'
   aws_role_name:
     description: 'AWS IAM role name for Cloud Manager'
-    required: false
+    required: true
   aws_peering_role_name:
     description: 'AWS IAM role name for peering operations'
-    required: false
+    required: true
 runs:
   using: composite
   steps:

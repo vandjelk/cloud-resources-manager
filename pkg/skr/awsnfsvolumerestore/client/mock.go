@@ -63,10 +63,10 @@ func (m *mockClient) GetRecoveryPointRestoreMetadata(_ context.Context, _, backu
 		BackupVaultArn:   ptr.To(backupVaultName),
 		RecoveryPointArn: ptr.To(recoveryPointArn),
 		RestoreMetadata: map[string]string{
-			"newFileSystem": "true", // AWS default - create new filesystem
+			"newFileSystem":   "true", // AWS default - create new filesystem
 			"PerformanceMode": "generalPurpose",
 		},
-		ResourceType:     ptr.To("EFS"),
+		ResourceType: ptr.To("EFS"),
 	}, nil
 }
 

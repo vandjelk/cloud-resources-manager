@@ -57,9 +57,9 @@ func startAwsRestore(ctx context.Context, st composed.State) (error, context.Con
 	// Log the metadata we received from AWS
 	logger.Info("Restore metadata from AWS", "metadata", restoreMetadataOut.RestoreMetadata)
 
-	// AWS returns metadata for creating a NEW filesystem by default
-	// We need to restore to the EXISTING filesystem, so replace all metadata
-	// with just the file-system-id parameter
+	// AWS returns metadata that may include parameters for creating a NEW filesystem
+	// We need to restore to the EXISTING filesystem, so set both file-system-id and newFileSystem
+	// References: https://docs.aws.amazon.com/aws-backup/latest/devguide/restoring-efs.html
 	fileSystemId := state.GetFileSystemId()
 	if fileSystemId == "" {
 		restore.Status.State = cloudresourcesv1beta1.JobStateError
@@ -76,9 +76,11 @@ func startAwsRestore(ctx context.Context, st composed.State) (error, context.Con
 	}
 
 	// Set metadata to restore to existing filesystem
+	// newFileSystem=false tells AWS to restore to existing EFS
 	// AWS Backup will restore to a timestamped subdirectory by default
 	restoreMetadataOut.RestoreMetadata = map[string]string{
 		"file-system-id": fileSystemId,
+		"newFileSystem":  "false",
 	}
 
 	logger.Info("Modified restore metadata for existing filesystem", "metadata", restoreMetadataOut.RestoreMetadata, "fileSystemId", fileSystemId)

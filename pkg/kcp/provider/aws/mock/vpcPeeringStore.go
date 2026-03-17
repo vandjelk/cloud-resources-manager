@@ -4,19 +4,21 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"sync"
+
 	ec2types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
 	"github.com/aws/smithy-go"
 	"github.com/elliotchance/pie/v2"
 	"github.com/google/uuid"
 	"github.com/kyma-project/cloud-manager/pkg/util"
 	"k8s.io/utils/ptr"
-	"sync"
 )
 
 type VpcPeeringConfig interface {
 	SetVpcPeeringConnectionStatusCode(requesterVpcId, accepterVpcId string, code ec2types.VpcPeeringConnectionStateReasonCode) error
 	InitiateVpcPeeringConnection(connectionId, requesterVpcId, accepterVpcId string)
 	SetVpcPeeringConnectionError(connectionId string, err error)
+	HardDeleteVpcPeeringConnection(connectionId *string) error
 }
 
 type vpcPeeringEntry struct {
@@ -149,7 +151,7 @@ func (s *vpcPeeringStore) AcceptVpcPeeringConnection(ctx context.Context, connec
 	s.m.Lock()
 	defer s.m.Unlock()
 
-	if err, ok := s.errorMap[*connectionId]; ok {
+	if err, ok := s.errorMap[*connectionId]; ok && err != nil {
 		return nil, err
 	}
 
@@ -177,9 +179,11 @@ func (s *vpcPeeringStore) DeleteVpcPeeringConnection(ctx context.Context, connec
 	}
 
 	deleted := false
-	s.items = pie.Filter(s.items, func(x *vpcPeeringEntry) bool {
-		deleted = ptr.Equal(x.peering.VpcPeeringConnectionId, connectionId)
-		return !deleted
+	s.items = pie.Each(s.items, func(x *vpcPeeringEntry) {
+		if ptr.Equal(x.peering.VpcPeeringConnectionId, connectionId) {
+			x.peering.Status.Code = ec2types.VpcPeeringConnectionStateReasonCodeDeleted
+			deleted = true
+		}
 	})
 
 	if !deleted {
@@ -229,4 +233,28 @@ func (s *vpcPeeringStore) InitiateVpcPeeringConnection(connectionId, requesterVp
 
 func (s *vpcPeeringStore) SetVpcPeeringConnectionError(connectionId string, err error) {
 	s.errorMap[connectionId] = err
+}
+
+func (s *vpcPeeringStore) HardDeleteVpcPeeringConnection(connectionId *string) error {
+	s.m.Lock()
+	defer s.m.Unlock()
+
+	if err, ok := s.errorMap[*connectionId]; ok && err != nil {
+		return err
+	}
+
+	deleted := false
+	s.items = pie.Filter(s.items, func(x *vpcPeeringEntry) bool {
+		if ptr.Equal(x.peering.VpcPeeringConnectionId, connectionId) {
+			deleted = true
+			return false
+		}
+		return true
+	})
+
+	if !deleted {
+		return errors.New("peering connection not found")
+	}
+
+	return nil
 }

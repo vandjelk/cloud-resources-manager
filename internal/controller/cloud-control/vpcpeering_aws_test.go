@@ -346,7 +346,14 @@ var _ = Describe("Feature: KCP VpcPeering", func() {
 
 		By("And Then local VpcPeeringConnection is deleted", func() {
 			localPeering, _ := awsMockLocal.DescribeVpcPeeringConnection(infra.Ctx(), kcpPeering.Status.Id)
-			Expect(localPeering).To(BeNil())
+			Expect(localPeering.Status.Code).To(Equal(ec2types.VpcPeeringConnectionStateReasonCodeDeleted))
+		})
+
+		By("And Then local VpcPeeringConnection is deleted by AWS", func() {
+			// Simulate AWS hard-deleting the connection after the visibility period
+			// (2 hours for deleting party, 2 days for other party)
+			err := awsMockLocal.HardDeleteVpcPeeringConnection(ptr.To(kcpPeering.Status.Id))
+			Expect(err).NotTo(HaveOccurred())
 		})
 
 		By("And Then local route tables have no peering routes to remote VPC CIDRs", func() {
@@ -365,7 +372,7 @@ var _ = Describe("Feature: KCP VpcPeering", func() {
 
 		By("And Then remote VpcPeeringConnection is deleted", func() {
 			remotePeering, _ := awsMockRemote.DescribeVpcPeeringConnection(infra.Ctx(), kcpPeering.Status.Id)
-			Expect(remotePeering).To(BeNil())
+			Expect(remotePeering.Status.Code).To(Equal(ec2types.VpcPeeringConnectionStateReasonCodeDeleted))
 		})
 
 		By("And Then remote route tables have no peering routes to local VPC CIDRs", func() {
@@ -596,7 +603,14 @@ var _ = Describe("Feature: KCP VpcPeering", func() {
 
 		By("And Then local VpcPeeringConnection is deleted", func() {
 			localPeering, _ := awsMockLocal.DescribeVpcPeeringConnection(infra.Ctx(), kcpPeering.Status.Id)
-			Expect(localPeering).To(BeNil())
+			Expect(localPeering.Status.Code).To(Equal(ec2types.VpcPeeringConnectionStateReasonCodeDeleted))
+		})
+
+		By("And Then local VpcPeeringConnection is deleted by AWS", func() {
+			// Simulate AWS hard-deleting the connection after the visibility period
+			// (2 hours for deleting party, 2 days for other party)
+			err := awsMockLocal.HardDeleteVpcPeeringConnection(ptr.To(kcpPeering.Status.Id))
+			Expect(err).NotTo(HaveOccurred())
 		})
 
 		// remove peering connection error from mock so that we could verify it
@@ -604,7 +618,7 @@ var _ = Describe("Feature: KCP VpcPeering", func() {
 
 		By("And Then remote VpcPeeringConnection is not deleted", func() {
 			remotePeering, _ := awsMockRemote.DescribeVpcPeeringConnection(infra.Ctx(), kcpPeering.Status.Id)
-			Expect(remotePeering).NotTo(BeNil())
+			Expect(remotePeering.Status.Code).To(Equal(ec2types.VpcPeeringConnectionStateReasonCodeActive))
 		})
 
 		By("And Then remote route tables have routes to local VPC CIDR", func() {
@@ -848,7 +862,14 @@ var _ = Describe("Feature: KCP VpcPeering", func() {
 
 		By("And Then local VpcPeeringConnection is deleted", func() {
 			localPeering, _ := awsMockLocal.DescribeVpcPeeringConnection(infra.Ctx(), kcpPeering.Status.Id)
-			Expect(localPeering).To(BeNil())
+			Expect(localPeering.Status.Code).To(Equal(ec2types.VpcPeeringConnectionStateReasonCodeDeleted))
+		})
+
+		By("And Then local VpcPeeringConnection is deleted by AWS", func() {
+			// Simulate AWS hard-deleting the connection after the visibility period
+			// (2 hours for deleting party, 2 days for other party)
+			err := awsMockLocal.HardDeleteVpcPeeringConnection(ptr.To(kcpPeering.Status.Id))
+			Expect(err).NotTo(HaveOccurred())
 		})
 
 		By("And Then remote VpcPeeringConnection is not deleted", func() {
@@ -1182,7 +1203,14 @@ var _ = Describe("Feature: KCP VpcPeering", func() {
 
 		By("And Then local VpcPeeringConnection is deleted", func() {
 			localPeering, _ := awsMockLocal.DescribeVpcPeeringConnection(infra.Ctx(), kcpPeering.Status.Id)
-			Expect(localPeering).To(BeNil())
+			Expect(localPeering.Status.Code).To(Equal(ec2types.VpcPeeringConnectionStateReasonCodeDeleted))
+		})
+
+		By("And Then local VpcPeeringConnection is deleted by AWS", func() {
+			// Simulate AWS hard-deleting the connection after the visibility period
+			// (2 hours for deleting party, 2 days for other party)
+			err := awsMockLocal.HardDeleteVpcPeeringConnection(ptr.To(kcpPeering.Status.Id))
+			Expect(err).NotTo(HaveOccurred())
 		})
 
 		By("And Then local route tables have no peering routes to remote VPC CIDR", func() {

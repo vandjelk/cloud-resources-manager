@@ -1,0 +1,288 @@
+{
+    "apiVersion": "2025-05-01",
+    "id": "/subscriptions/3f1d2fbd-117a-4742-8bde-6edbcdee6a04/resourceGroups/shoot--spm-test01--va-0232ca--cm/providers/Microsoft.Network/applicationGateways/shoot--spm-test01--va-0232ca-appgw",
+    "name": "shoot--spm-test01--va-0232ca-appgw",
+    "type": "microsoft.network/applicationgateways",
+    "location": "westeurope",
+    "tags": {},
+    "properties": {
+        "provisioningState": "Succeeded",
+        "resourceGuid": "0c70df43-eeb6-4683-92f0-9c8f30c99b6b",
+        "sku": {
+            "name": "WAF_v2",
+            "tier": "WAF_v2",
+            "family": "Generation_1"
+        },
+        "operationalState": "Running",
+        "gatewayIPConfigurations": [
+            {
+                "name": "appgw-ipcfg",
+                "id": "/subscriptions/3f1d2fbd-117a-4742-8bde-6edbcdee6a04/resourceGroups/shoot--spm-test01--va-0232ca--cm/providers/Microsoft.Network/applicationGateways/shoot--spm-test01--va-0232ca-appgw/gatewayIPConfigurations/appgw-ipcfg",
+                "etag": "W/\"fd4097ad-8068-4542-855c-1d5ebde9aa61\"",
+                "properties": {
+                    "provisioningState": "Succeeded",
+                    "subnet": {
+                        "id": "/subscriptions/3f1d2fbd-117a-4742-8bde-6edbcdee6a04/resourceGroups/shoot--spm-test01--va-0232ca--cm/providers/Microsoft.Network/virtualNetworks/shoot--spm-test01--va-0232ca--cm/subnets/default"
+                    }
+                },
+                "type": "Microsoft.Network/applicationGateways/gatewayIPConfigurations"
+            }
+        ],
+        "sslCertificates": [
+            {
+                "name": "frontend-cert",
+                "id": "/subscriptions/3f1d2fbd-117a-4742-8bde-6edbcdee6a04/resourceGroups/shoot--spm-test01--va-0232ca--cm/providers/Microsoft.Network/applicationGateways/shoot--spm-test01--va-0232ca-appgw/sslCertificates/frontend-cert",
+                "etag": "W/\"fd4097ad-8068-4542-855c-1d5ebde9aa61\"",
+                "properties": {
+                    "provisioningState": "Succeeded",
+                    "publicCertData": "MIIDfQYJKoZIhvcNAQcCoIIDbjCCA2oCAQExADALBgkqhkiG9w0BBwGgggNSMIIDTjCCAjagAwIBAgIUNpg21bX98jyRDlZQ+rnu0ZB8Fz8wDQYJKoZIhvcNAQELBQAwHTEbMBkGA1UEAwwSKi50ZXN0LmV4YW1wbGUuY29tMB4XDTI2MDIwOTE2NTE1MVoXDTI3MDIwOTE2NTE1MVowHTEbMBkGA1UEAwwSKi50ZXN0LmV4YW1wbGUuY29tMIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAsm1zK4Iw+fTwHAAwhVkAEKaaA6Fx3qWk7ynfiLnnKAvRJif7qfQzezbuNncVt108D0sSNL5mt8kiV+59YGKXk/BIvBE7GFU6nw4iDQpzlS2pT4tr3iaOEuIo9xfGjzEp1re9VospTjbZW5XpJZscM6V07XZS9UkKVnOGVbclxowEnW4GbyDsSGUHqwHbtSjGpbE9albAD0u8cjtYFHcyylDDxexp74uNCePPGHOdxg3/J/LqS+VSaiSiafXJyRJKCNZ3ty60c8rCLhqhnsHLC9M2Uvl1UnHSZ3fe/Ithl5GkKc8q1DPZMKHHzkC6gb9cI6KtQPHv7r/b/0e6zvkUFQIDAQABo4GFMIGCMB0GA1UdDgQWBBQbhDkEig1PthSGhTNvz/19Rz1gcTAfBgNVHSMEGDAWgBQbhDkEig1PthSGhTNvz/19Rz1gcTAPBgNVHRMBAf8EBTADAQH/MC8GA1UdEQQoMCaCEioudGVzdC5leGFtcGxlLmNvbYIQdGVzdC5leGFtcGxlLmNvbTANBgkqhkiG9w0BAQsFAAOCAQEAB/U4vRkd4ojLvNPcSouSNNqQbV5EyvzZzKFgTLjHwUnHzXJNL2ImhYvdsmmIfh+dcnijuOeA6dHgoJXDowyNkSrc+1nB0XMKI0U/cU6p621RRgM8A8S0ebSvyrdPenwVeOfkb8pKyxYbyA2lc5/A5GBC3UMSq0jNLdsxezXhv/IIh6PbJHJE9tjBJBqldBAveQaSxX9JKYXoOivCWyHenLrxDHmPql5ClPiKn4iR8SVf4+dhwinqszI9w2Qu/KHRwVVBzCH7Pd3GvTwVC/pVG2aAPJsHuAZDc1Lj0X1l2HehiznlqsZUYA5ih5O6vXEU0Vqj5pz6cVy/PfjfyobphjEA",
+                    "httpListeners": [
+                        {
+                            "id": "/subscriptions/3f1d2fbd-117a-4742-8bde-6edbcdee6a04/resourceGroups/shoot--spm-test01--va-0232ca--cm/providers/Microsoft.Network/applicationGateways/shoot--spm-test01--va-0232ca-appgw/httpListeners/https-listener"
+                        }
+                    ]
+                },
+                "type": "Microsoft.Network/applicationGateways/sslCertificates"
+            }
+        ],
+        "trustedRootCertificates": [
+            {
+                "name": "nginx-root",
+                "id": "/subscriptions/3f1d2fbd-117a-4742-8bde-6edbcdee6a04/resourceGroups/shoot--spm-test01--va-0232ca--cm/providers/Microsoft.Network/applicationGateways/shoot--spm-test01--va-0232ca-appgw/trustedRootCertificates/nginx-root",
+                "etag": "W/\"fd4097ad-8068-4542-855c-1d5ebde9aa61\"",
+                "properties": {
+                    "provisioningState": "Succeeded",
+                    "data": "LS0tLS1CRUdJTiBDRVJUSUZJQ0FURS0tLS0tCk1JSURUakNDQWphZ0F3SUJBZ0lVTnBnMjFiWDk4anlSRGxaUStybnUwWkI4Rno4d0RRWUpLb1pJaHZjTkFRRUwKQlFBd0hURWJNQmtHQTFVRUF3d1NLaTUwWlhOMExtVjRZVzF3YkdVdVkyOXRNQjRYRFRJMk1ESXdPVEUyTlRFMQpNVm9YRFRJM01ESXdPVEUyTlRFMU1Wb3dIVEViTUJrR0ExVUVBd3dTS2k1MFpYTjBMbVY0WVcxd2JHVXVZMjl0Ck1JSUJJakFOQmdrcWhraUc5dzBCQVFFRkFBT0NBUThBTUlJQkNnS0NBUUVBc20xeks0SXcrZlR3SEFBd2hWa0EKRUthYUE2RngzcVdrN3luZmlMbm5LQXZSSmlmN3FmUXplemJ1Tm5jVnQxMDhEMHNTTkw1bXQ4a2lWKzU5WUdLWAprL0JJdkJFN0dGVTZudzRpRFFwemxTMnBUNHRyM2lhT0V1SW85eGZHanpFcDFyZTlWb3NwVGpiWlc1WHBKWnNjCk02VjA3WFpTOVVrS1ZuT0dWYmNseG93RW5XNEdieURzU0dVSHF3SGJ0U2pHcGJFOWFsYkFEMHU4Y2p0WUZIY3kKeWxERHhleHA3NHVOQ2VQUEdIT2R4ZzMvSi9McVMrVlNhaVNpYWZYSnlSSktDTlozdHk2MGM4ckNMaHFobnNITApDOU0yVXZsMVVuSFNaM2ZlL0l0aGw1R2tLYzhxMURQWk1LSEh6a0M2Z2I5Y0k2S3RRUEh2N3IvYi8wZTZ6dmtVCkZRSURBUUFCbzRHRk1JR0NNQjBHQTFVZERnUVdCQlFiaERrRWlnMVB0aFNHaFROdnovMTlSejFnY1RBZkJnTlYKSFNNRUdEQVdnQlFiaERrRWlnMVB0aFNHaFROdnovMTlSejFnY1RBUEJnTlZIUk1CQWY4RUJUQURBUUgvTUM4RwpBMVVkRVFRb01DYUNFaW91ZEdWemRDNWxlR0Z0Y0d4bExtTnZiWUlRZEdWemRDNWxlR0Z0Y0d4bExtTnZiVEFOCkJna3Foa2lHOXcwQkFRc0ZBQU9DQVFFQUIvVTR2UmtkNG9qTHZOUGNTb3VTTk5xUWJWNUV5dnpaektGZ1RMakgKd1VuSHpYSk5MMkltaFl2ZHNtbUlmaCtkY25panVPZUE2ZEhnb0pYRG93eU5rU3JjKzFuQjBYTUtJMFUvY1U2cAo2MjFSUmdNOEE4UzBlYlN2eXJkUGVud1ZlT2ZrYjhwS3l4WWJ5QTJsYzUvQTVHQkMzVU1TcTBqTkxkc3hlelhoCnYvSUloNlBiSkhKRTl0akJKQnFsZEJBdmVRYVN4WDlKS1lYb09pdkNXeUhlbkxyeERIbVBxbDVDbFBpS240aVIKOFNWZjQrZGh3aW5xc3pJOXcyUXUvS0hSd1ZWQnpDSDdQZDNHdlR3VkMvcFZHMmFBUEpzSHVBWkRjMUxqMFgxbAoySGVoaXpubHFzWlVZQTVpaDVPNnZYRVUwVnFqNXB6NmNWeS9QZmpmeW9icGhnPT0KLS0tLS1FTkQgQ0VSVElGSUNBVEUtLS0tLQo=",
+                    "backendHttpSettings": [
+                        {
+                            "id": "/subscriptions/3f1d2fbd-117a-4742-8bde-6edbcdee6a04/resourceGroups/shoot--spm-test01--va-0232ca--cm/providers/Microsoft.Network/applicationGateways/shoot--spm-test01--va-0232ca-appgw/backendHttpSettingsCollection/k8s-http-setting"
+                        }
+                    ]
+                },
+                "type": "Microsoft.Network/applicationGateways/trustedRootCertificates"
+            }
+        ],
+        "trustedClientCertificates": [],
+        "sslProfiles": [],
+        "frontendIPConfigurations": [
+            {
+                "name": "public-frontend",
+                "id": "/subscriptions/3f1d2fbd-117a-4742-8bde-6edbcdee6a04/resourceGroups/shoot--spm-test01--va-0232ca--cm/providers/Microsoft.Network/applicationGateways/shoot--spm-test01--va-0232ca-appgw/frontendIPConfigurations/public-frontend",
+                "etag": "W/\"fd4097ad-8068-4542-855c-1d5ebde9aa61\"",
+                "type": "Microsoft.Network/applicationGateways/frontendIPConfigurations",
+                "properties": {
+                    "provisioningState": "Succeeded",
+                    "privateIPAllocationMethod": "Dynamic",
+                    "publicIPAddress": {
+                        "id": "/subscriptions/3f1d2fbd-117a-4742-8bde-6edbcdee6a04/resourceGroups/shoot--spm-test01--va-0232ca--cm/providers/Microsoft.Network/publicIPAddresses/shoot--spm-test01--va-0232ca-pip"
+                    },
+                    "httpListeners": [
+                        {
+                            "id": "/subscriptions/3f1d2fbd-117a-4742-8bde-6edbcdee6a04/resourceGroups/shoot--spm-test01--va-0232ca--cm/providers/Microsoft.Network/applicationGateways/shoot--spm-test01--va-0232ca-appgw/httpListeners/https-listener"
+                        }
+                    ]
+                }
+            }
+        ],
+        "frontendPorts": [
+            {
+                "name": "https-port",
+                "id": "/subscriptions/3f1d2fbd-117a-4742-8bde-6edbcdee6a04/resourceGroups/shoot--spm-test01--va-0232ca--cm/providers/Microsoft.Network/applicationGateways/shoot--spm-test01--va-0232ca-appgw/frontendPorts/https-port",
+                "etag": "W/\"fd4097ad-8068-4542-855c-1d5ebde9aa61\"",
+                "properties": {
+                    "provisioningState": "Succeeded",
+                    "port": 443,
+                    "httpListeners": [
+                        {
+                            "id": "/subscriptions/3f1d2fbd-117a-4742-8bde-6edbcdee6a04/resourceGroups/shoot--spm-test01--va-0232ca--cm/providers/Microsoft.Network/applicationGateways/shoot--spm-test01--va-0232ca-appgw/httpListeners/https-listener"
+                        }
+                    ]
+                },
+                "type": "Microsoft.Network/applicationGateways/frontendPorts"
+            }
+        ],
+        "backendAddressPools": [
+            {
+                "name": "k8s-backend",
+                "id": "/subscriptions/3f1d2fbd-117a-4742-8bde-6edbcdee6a04/resourceGroups/shoot--spm-test01--va-0232ca--cm/providers/Microsoft.Network/applicationGateways/shoot--spm-test01--va-0232ca-appgw/backendAddressPools/k8s-backend",
+                "etag": "W/\"fd4097ad-8068-4542-855c-1d5ebde9aa61\"",
+                "properties": {
+                    "provisioningState": "Succeeded",
+                    "backendAddresses": [
+                        {
+                            "fqdn": "my.test.example.com"
+                        }
+                    ],
+                    "requestRoutingRules": [
+                        {
+                            "id": "/subscriptions/3f1d2fbd-117a-4742-8bde-6edbcdee6a04/resourceGroups/shoot--spm-test01--va-0232ca--cm/providers/Microsoft.Network/applicationGateways/shoot--spm-test01--va-0232ca-appgw/requestRoutingRules/default-rule"
+                        }
+                    ]
+                },
+                "type": "Microsoft.Network/applicationGateways/backendAddressPools"
+            }
+        ],
+        "loadDistributionPolicies": [],
+        "backendHttpSettingsCollection": [
+            {
+                "name": "k8s-http-setting",
+                "id": "/subscriptions/3f1d2fbd-117a-4742-8bde-6edbcdee6a04/resourceGroups/shoot--spm-test01--va-0232ca--cm/providers/Microsoft.Network/applicationGateways/shoot--spm-test01--va-0232ca-appgw/backendHttpSettingsCollection/k8s-http-setting",
+                "etag": "W/\"fd4097ad-8068-4542-855c-1d5ebde9aa61\"",
+                "properties": {
+                    "provisioningState": "Succeeded",
+                    "port": 443,
+                    "protocol": "Https",
+                    "cookieBasedAffinity": "Disabled",
+                    "pickHostNameFromBackendAddress": true,
+                    "dedicatedBackendConnection": false,
+                    "affinityCookieName": "ApplicationGatewayAffinity",
+                    "validateCertChainAndExpiry": true,
+                    "validateSNI": true,
+                    "sniName": null,
+                    "path": "",
+                    "requestTimeout": 30,
+                    "probe": {
+                        "id": "/subscriptions/3f1d2fbd-117a-4742-8bde-6edbcdee6a04/resourceGroups/shoot--spm-test01--va-0232ca--cm/providers/Microsoft.Network/applicationGateways/shoot--spm-test01--va-0232ca-appgw/probes/k8s-probe"
+                    },
+                    "trustedRootCertificates": [
+                        {
+                            "id": "/subscriptions/3f1d2fbd-117a-4742-8bde-6edbcdee6a04/resourceGroups/shoot--spm-test01--va-0232ca--cm/providers/Microsoft.Network/applicationGateways/shoot--spm-test01--va-0232ca-appgw/trustedRootCertificates/nginx-root"
+                        }
+                    ],
+                    "requestRoutingRules": [
+                        {
+                            "id": "/subscriptions/3f1d2fbd-117a-4742-8bde-6edbcdee6a04/resourceGroups/shoot--spm-test01--va-0232ca--cm/providers/Microsoft.Network/applicationGateways/shoot--spm-test01--va-0232ca-appgw/requestRoutingRules/default-rule"
+                        }
+                    ]
+                },
+                "type": "Microsoft.Network/applicationGateways/backendHttpSettingsCollection"
+            }
+        ],
+        "backendSettingsCollection": [],
+        "httpListeners": [
+            {
+                "name": "https-listener",
+                "id": "/subscriptions/3f1d2fbd-117a-4742-8bde-6edbcdee6a04/resourceGroups/shoot--spm-test01--va-0232ca--cm/providers/Microsoft.Network/applicationGateways/shoot--spm-test01--va-0232ca-appgw/httpListeners/https-listener",
+                "etag": "W/\"fd4097ad-8068-4542-855c-1d5ebde9aa61\"",
+                "properties": {
+                    "provisioningState": "Succeeded",
+                    "frontendIPConfiguration": {
+                        "id": "/subscriptions/3f1d2fbd-117a-4742-8bde-6edbcdee6a04/resourceGroups/shoot--spm-test01--va-0232ca--cm/providers/Microsoft.Network/applicationGateways/shoot--spm-test01--va-0232ca-appgw/frontendIPConfigurations/public-frontend"
+                    },
+                    "frontendPort": {
+                        "id": "/subscriptions/3f1d2fbd-117a-4742-8bde-6edbcdee6a04/resourceGroups/shoot--spm-test01--va-0232ca--cm/providers/Microsoft.Network/applicationGateways/shoot--spm-test01--va-0232ca-appgw/frontendPorts/https-port"
+                    },
+                    "protocol": "Https",
+                    "sslCertificate": {
+                        "id": "/subscriptions/3f1d2fbd-117a-4742-8bde-6edbcdee6a04/resourceGroups/shoot--spm-test01--va-0232ca--cm/providers/Microsoft.Network/applicationGateways/shoot--spm-test01--va-0232ca-appgw/sslCertificates/frontend-cert"
+                    },
+                    "hostNames": [
+                        "*.test.example.com"
+                    ],
+                    "requireServerNameIndication": true,
+                    "enableHttp3": false,
+                    "requestRoutingRules": [
+                        {
+                            "id": "/subscriptions/3f1d2fbd-117a-4742-8bde-6edbcdee6a04/resourceGroups/shoot--spm-test01--va-0232ca--cm/providers/Microsoft.Network/applicationGateways/shoot--spm-test01--va-0232ca-appgw/requestRoutingRules/default-rule"
+                        }
+                    ]
+                },
+                "type": "Microsoft.Network/applicationGateways/httpListeners"
+            }
+        ],
+        "listeners": [],
+        "urlPathMaps": [],
+        "requestRoutingRules": [
+            {
+                "name": "default-rule",
+                "id": "/subscriptions/3f1d2fbd-117a-4742-8bde-6edbcdee6a04/resourceGroups/shoot--spm-test01--va-0232ca--cm/providers/Microsoft.Network/applicationGateways/shoot--spm-test01--va-0232ca-appgw/requestRoutingRules/default-rule",
+                "etag": "W/\"fd4097ad-8068-4542-855c-1d5ebde9aa61\"",
+                "properties": {
+                    "provisioningState": "Succeeded",
+                    "ruleType": "Basic",
+                    "priority": 100,
+                    "httpListener": {
+                        "id": "/subscriptions/3f1d2fbd-117a-4742-8bde-6edbcdee6a04/resourceGroups/shoot--spm-test01--va-0232ca--cm/providers/Microsoft.Network/applicationGateways/shoot--spm-test01--va-0232ca-appgw/httpListeners/https-listener"
+                    },
+                    "backendAddressPool": {
+                        "id": "/subscriptions/3f1d2fbd-117a-4742-8bde-6edbcdee6a04/resourceGroups/shoot--spm-test01--va-0232ca--cm/providers/Microsoft.Network/applicationGateways/shoot--spm-test01--va-0232ca-appgw/backendAddressPools/k8s-backend"
+                    },
+                    "backendHttpSettings": {
+                        "id": "/subscriptions/3f1d2fbd-117a-4742-8bde-6edbcdee6a04/resourceGroups/shoot--spm-test01--va-0232ca--cm/providers/Microsoft.Network/applicationGateways/shoot--spm-test01--va-0232ca-appgw/backendHttpSettingsCollection/k8s-http-setting"
+                    }
+                },
+                "type": "Microsoft.Network/applicationGateways/requestRoutingRules"
+            }
+        ],
+        "routingRules": [],
+        "probes": [
+            {
+                "name": "k8s-probe",
+                "id": "/subscriptions/3f1d2fbd-117a-4742-8bde-6edbcdee6a04/resourceGroups/shoot--spm-test01--va-0232ca--cm/providers/Microsoft.Network/applicationGateways/shoot--spm-test01--va-0232ca-appgw/probes/k8s-probe",
+                "etag": "W/\"fd4097ad-8068-4542-855c-1d5ebde9aa61\"",
+                "properties": {
+                    "provisioningState": "Succeeded",
+                    "protocol": "Https",
+                    "host": "my.test.example.com",
+                    "port": 443,
+                    "path": "/",
+                    "interval": 30,
+                    "timeout": 30,
+                    "unhealthyThreshold": 3,
+                    "pickHostNameFromBackendHttpSettings": false,
+                    "enableProbeProxyProtocolHeader": false,
+                    "minServers": 0,
+                    "match": {
+                        "body": "",
+                        "statusCodes": [
+                            "200-399"
+                        ]
+                    },
+                    "backendHttpSettings": [
+                        {
+                            "id": "/subscriptions/3f1d2fbd-117a-4742-8bde-6edbcdee6a04/resourceGroups/shoot--spm-test01--va-0232ca--cm/providers/Microsoft.Network/applicationGateways/shoot--spm-test01--va-0232ca-appgw/backendHttpSettingsCollection/k8s-http-setting"
+                        }
+                    ]
+                },
+                "type": "Microsoft.Network/applicationGateways/probes"
+            }
+        ],
+        "rewriteRuleSets": [],
+        "redirectConfigurations": [],
+        "privateLinkConfigurations": [],
+        "privateEndpointConnections": [],
+        "entraJWTValidationConfigs": [],
+        "sslPolicy": {
+            "policyType": "Predefined",
+            "policyName": "AppGwSslPolicy20220101"
+        },
+        "webApplicationFirewallConfiguration": {
+            "enabled": true,
+            "firewallMode": "Detection",
+            "ruleSetType": "OWASP",
+            "ruleSetVersion": "3.2",
+            "disabledRuleGroups": [
+                {
+                    "ruleGroupName": "REQUEST-942-APPLICATION-ATTACK-SQLI",
+                    "rules": [
+                        942100,
+                        942110
+                    ]
+                }
+            ],
+            "exclusions": [],
+            "requestBodyCheck": true,
+            "maxRequestBodySizeInKb": 128,
+            "fileUploadLimitInMb": 100
+        },
+        "enableHttp2": false,
+        "enableFIPS": false,
+        "defaultPredefinedSslPolicy": "AppGwSslPolicy20220101",
+        "autoscaleConfiguration": {
+            "minCapacity": 1,
+            "maxCapacity": 10
+        },
+        "customErrorConfigurations": []
+    },
+    "etag": "W/\"fd4097ad-8068-4542-855c-1d5ebde9aa61\""
+}

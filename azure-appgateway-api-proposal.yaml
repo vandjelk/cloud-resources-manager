@@ -1,0 +1,544 @@
+---
+# Azure Application Gateway API Proposal
+# Kubernetes-style CRD for cloud-control.kyma-project.io/v1beta1
+# Based on: https://pkg.go.dev/github.com/Azure/azure-sdk-for-go/arm/network#ApplicationGatewaysClient.CreateOrUpdate
+
+apiVersion: cloud-control.kyma-project.io/v1beta1
+kind: AzureApplicationGateway
+metadata:
+  name: example-appgw
+  namespace: kcp-system
+spec:
+  # Reference to the Scope containing Azure credentials and subscription
+  scope:
+    name: azure-scope
+
+  # Remote Azure resource name (immutable)
+  # Must be unique within the resource group
+  remoteRef:
+    name: my-application-gateway
+
+  # Azure region/location
+  # +kubebuilder:validation:Required
+  location: westeurope
+
+  # Resource tags
+  tags:
+    environment: production
+    team: platform
+
+  # SKU configuration
+  # +kubebuilder:validation:Required
+  sku:
+    # SKU name: Standard_Small, Standard_Medium, Standard_Large, WAF_Medium, WAF_Large, Standard_v2, WAF_v2
+    name: Standard_v2
+    # Tier: Standard, WAF, Standard_v2, WAF_v2
+    tier: Standard_v2
+    # Capacity (instance count)
+    # For v2 SKUs, use autoscaleConfiguration instead
+    capacity: 2
+
+  # Autoscale configuration (v2 SKUs only)
+  autoscaleConfiguration:
+    minCapacity: 2
+    maxCapacity: 10
+
+  # Gateway IP configurations
+  # At least one required - defines how the gateway connects to the VNet
+  gatewayIPConfigurations:
+    - name: gateway-ip-config
+      # Reference to subnet (use name instead of Azure resource ID)
+      subnetName: gateway-subnet
+      # VNet name for the subnet
+      vnetName: kyma-vnet
+
+  # Frontend IP configurations
+  # Defines public/private IPs for the gateway
+  frontendIPConfigurations:
+    - name: public-frontend
+      # Either publicIPAddressName or privateIPAddress (not both)
+      publicIPAddressName: appgw-public-ip
+      # Optional: privateIPAllocationMethod: Static or Dynamic
+    - name: private-frontend
+      privateIPAddress: 10.0.1.100
+      privateIPAllocationMethod: Static
+      # Reference to subnet for private IP
+      subnetName: gateway-subnet
+      vnetName: kyma-vnet
+
+  # Frontend ports
+  # Ports the gateway listens on
+  frontendPorts:
+    - name: http-port
+      port: 80
+    - name: https-port
+      port: 443
+    - name: custom-port
+      port: 8080
+
+  # Probes for backend health checks
+  # Referenced by name in backendHttpSettingsCollection
+  probes:
+    - name: health-probe-http
+      protocol: Http
+      path: /health
+      interval: 30  # seconds
+      timeout: 30   # seconds
+      unhealthyThreshold: 3
+      # Pick host from backend HTTP settings
+      pickHostNameFromBackendHttpSettings: true
+      # Minimum servers required to be healthy
+      minServers: 0
+      match:
+        # Expected status codes (e.g., 200-399)
+        statusCodes:
+          - "200-399"
+    - name: health-probe-https
+      protocol: Https
+      host: api.example.com
+      path: /healthz
+      interval: 30
+      timeout: 30
+      unhealthyThreshold: 3
+      pickHostNameFromBackendHttpSettings: false
+
+  # SSL certificates
+  # Referenced by name in httpListeners
+  sslCertificates:
+    - name: wildcard-cert
+      # Certificate data (base64 encoded PFX)
+      # In practice, reference from Secret
+      data: "base64-encoded-pfx-data"
+      password: "cert-password"
+    - name: keyvault-cert
+      # Alternative: reference from Azure Key Vault
+      keyVaultSecretId: "https://myvault.vault.azure.net/secrets/mycert"
+
+  # Trusted root certificates (for backend HTTPS)
+  trustedRootCertificates:
+    - name: custom-ca
+      data: "base64-encoded-cert-data"
+
+  # Backend address pools
+  # Targets for routing traffic
+  backendAddressPools:
+    - name: backend-pool-1
+      backendAddresses:
+        - ipAddress: 10.0.2.4
+        - ipAddress: 10.0.2.5
+        - fqdn: backend1.internal.example.com
+    - name: backend-pool-2
+      backendAddresses:
+        - fqdn: backend2.internal.example.com
+
+  # Backend HTTP settings
+  # Defines how to communicate with backends
+  backendHttpSettingsCollection:
+    - name: http-settings-80
+      port: 80
+      protocol: Http
+      cookieBasedAffinity: Disabled
+      requestTimeout: 30  # seconds
+      # Reference probe by name (not Azure resource ID)
+      probeName: health-probe-http
+      pickHostNameFromBackendAddress: false
+      hostName: backend.example.com
+      # Path override
+      path: /api
+      # Connection draining
+      connectionDraining:
+        enabled: true
+        drainTimeoutInSec: 60
+    - name: https-settings-443
+      port: 443
+      protocol: Https
+      cookieBasedAffinity: Enabled
+      affinityCookieName: ApplicationGatewayAffinity
+      requestTimeout: 120
+      probeName: health-probe-https
+      pickHostNameFromBackendAddress: true
+      # Trusted root certificate for backend HTTPS
+      trustedRootCertificateNames:
+        - custom-ca
+
+  # HTTP listeners
+  # Entry points for requests
+  httpListeners:
+    - name: http-listener
+      # Reference frontend IP by name
+      frontendIPConfigurationName: public-frontend
+      # Reference frontend port by name
+      frontendPortName: http-port
+      protocol: Http
+      hostName: www.example.com
+      requireServerNameIndication: false
+    - name: https-listener
+      frontendIPConfigurationName: public-frontend
+      frontendPortName: https-port
+      protocol: Https
+      hostName: api.example.com
+      requireServerNameIndication: true
+      # Reference SSL certificate by name
+      sslCertificateName: wildcard-cert
+      # SSL policy
+      sslProfile: ""
+    - name: multi-site-listener
+      frontendIPConfigurationName: public-frontend
+      frontendPortName: https-port
+      protocol: Https
+      # Multiple hostnames for multi-site
+      hostNames:
+        - site1.example.com
+        - site2.example.com
+      sslCertificateName: wildcard-cert
+      requireServerNameIndication: true
+
+  # URL path maps for path-based routing
+  urlPathMaps:
+    - name: path-map-1
+      # Default backend when no path matches
+      defaultBackendAddressPoolName: backend-pool-1
+      defaultBackendHttpSettingsName: http-settings-80
+      pathRules:
+        - name: api-rule
+          paths:
+            - /api/*
+          backendAddressPoolName: backend-pool-2
+          backendHttpSettingsName: https-settings-443
+        - name: images-rule
+          paths:
+            - /images/*
+            - /static/*
+          backendAddressPoolName: backend-pool-1
+          backendHttpSettingsName: http-settings-80
+
+  # Request routing rules
+  # Maps listeners to backends
+  requestRoutingRules:
+    - name: basic-routing-http
+      ruleType: Basic
+      priority: 100
+      # Reference listener by name
+      httpListenerName: http-listener
+      # Reference backend by name
+      backendAddressPoolName: backend-pool-1
+      backendHttpSettingsName: http-settings-80
+    - name: path-based-routing
+      ruleType: PathBasedRouting
+      priority: 200
+      httpListenerName: https-listener
+      # Reference URL path map by name
+      urlPathMapName: path-map-1
+    - name: redirect-rule
+      ruleType: Basic
+      priority: 300
+      httpListenerName: http-listener
+      # Reference redirect configuration by name
+      redirectConfigurationName: http-to-https
+
+  # Redirect configurations
+  redirectConfigurations:
+    - name: http-to-https
+      redirectType: Permanent  # Permanent, Found, SeeOther, Temporary
+      targetListenerName: https-listener
+      includePath: true
+      includeQueryString: true
+
+  # Rewrite rule sets
+  rewriteRuleSets:
+    - name: header-rewrite
+      rewriteRules:
+        - name: add-custom-header
+          ruleSequence: 100
+          conditions:
+            - variable: http_req_Host
+              pattern: ".*example\\.com"
+              ignoreCase: true
+              negate: false
+          actionSet:
+            requestHeaderConfigurations:
+              - headerName: X-Forwarded-Host
+                headerValue: "{var_host}"
+            responseHeaderConfigurations:
+              - headerName: X-Custom-Header
+                headerValue: "CustomValue"
+            urlConfiguration:
+              modifiedPath: "/v2{var_uri_path}"
+              modifiedQueryString: "api-version=2.0"
+              reroute: false
+
+  # Web Application Firewall configuration (WAF SKUs only)
+  webApplicationFirewallConfiguration:
+    enabled: true
+    firewallMode: Prevention  # Detection or Prevention
+    ruleSetType: OWASP
+    ruleSetVersion: "3.2"
+    disabledRuleGroups:
+      - ruleGroupName: REQUEST-942-APPLICATION-ATTACK-SQLI
+        rules:
+          - 942100
+          - 942200
+    requestBodyCheck: true
+    maxRequestBodySizeInKb: 128
+    fileUploadLimitInMb: 100
+    exclusions:
+      - matchVariable: RequestHeaderNames
+        selectorMatchOperator: Equals
+        selector: X-Custom-Header
+
+  # Firewall policy reference (WAF_v2 SKUs)
+  # Alternative to webApplicationFirewallConfiguration
+  firewallPolicyName: ""
+
+  # SSL policy
+  sslPolicy:
+    # PolicyType: Predefined or Custom
+    policyType: Predefined
+    # PolicyName for Predefined: AppGwSslPolicy20150501, AppGwSslPolicy20170401, AppGwSslPolicy20170401S, AppGwSslPolicy20220101, AppGwSslPolicy20220101S
+    policyName: AppGwSslPolicy20220101S
+    # For Custom policy:
+    # minProtocolVersion: TLSv1_2
+    # cipherSuites:
+    #   - TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384
+    #   - TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256
+
+  # Enable HTTP/2
+  enableHttp2: true
+
+  # Enable FIPS mode
+  enableFips: false
+
+  # Custom error configurations
+  customErrorConfigurations:
+    - statusCode: HttpStatus403
+      customErrorPageUrl: "https://example.com/errors/403.html"
+    - statusCode: HttpStatus502
+      customErrorPageUrl: "https://example.com/errors/502.html"
+
+  # Private link configuration (v2 SKUs)
+  privateLinkConfigurations:
+    - name: private-link-config
+      ipConfigurations:
+        - name: private-link-ip
+          privateIPAddress: 10.0.1.200
+          privateIPAllocationMethod: Static
+          subnetName: private-link-subnet
+          vnetName: kyma-vnet
+          primary: true
+
+  # Global configuration
+  globalConfiguration:
+    enableRequestBuffering: false
+    enableResponseBuffering: false
+
+status:
+  # Azure resource ID
+  id: ""
+
+  # Provisioning state from Azure
+  provisioningState: ""
+
+  # Operational state
+  operationalState: ""
+
+  # Public IP addresses assigned
+  publicIPAddresses:
+    - name: appgw-public-ip
+      ipAddress: 20.x.x.x
+
+  # Private IP addresses assigned
+  privateIPAddresses:
+    - 10.0.1.100
+
+  # Backend health status
+  backendHealth:
+    - backendAddressPoolName: backend-pool-1
+      backendHttpSettingsName: http-settings-80
+      servers:
+        - address: 10.0.2.4
+          health: Healthy
+        - address: 10.0.2.5
+          health: Unhealthy
+
+  # Observed generation
+  observedGeneration: 1
+
+  # Overall state
+  state: Ready  # Ready, Error, Processing, Warning, Deleting
+
+  # Kubernetes conditions
+  conditions:
+    - type: Ready
+      status: "True"
+      lastTransitionTime: "2024-01-01T00:00:00Z"
+      reason: Provisioned
+      message: Application Gateway is ready
+    - type: BackendHealthy
+      status: "True"
+      lastTransitionTime: "2024-01-01T00:00:00Z"
+      reason: AllBackendsHealthy
+      message: All backend pools are healthy
+
+---
+# Example: Real-world HTTPS configuration with WAF
+# Based on appgw-example.json (Azure API version 2025-05-01)
+apiVersion: cloud-control.kyma-project.io/v1beta1
+kind: AzureApplicationGateway
+metadata:
+  name: shoot--spm-test01--va-0232ca-appgw
+  namespace: kcp-system
+spec:
+  scope:
+    name: azure-scope
+
+  remoteRef:
+    name: shoot--spm-test01--va-0232ca-appgw
+
+  location: westeurope
+
+  tags: {}
+
+  sku:
+    name: WAF_v2
+    tier: WAF_v2
+    # family: Generation_1 (auto-detected by Azure)
+
+  autoscaleConfiguration:
+    minCapacity: 1
+    maxCapacity: 10
+
+  gatewayIPConfigurations:
+    - name: appgw-ipcfg
+      subnetName: default
+      vnetName: shoot--spm-test01--va-0232ca--cm
+
+  frontendIPConfigurations:
+    - name: public-frontend
+      # Dynamic private IP allocation
+      privateIPAllocationMethod: Dynamic
+      publicIPAddressName: shoot--spm-test01--va-0232ca-pip
+
+  frontendPorts:
+    - name: https-port
+      port: 443
+
+  sslCertificates:
+    - name: frontend-cert
+      # Certificate for *.test.example.com (self-signed, expires 2027-02-09)
+      # In production, use Key Vault reference or properly signed certificates
+      data: "MIIDfQYJKoZIhvcNAQcCoIIDbjCCA2oCAQExADALBgkqhkiG9w0BBwGgggNSMIIDTjCCAjagAwIBAgIUNpg21bX98jyRDlZQ+rnu0ZB8Fz8wDQYJKoZIhvcNAQELBQAwHTEbMBkGA1UEAwwSKi50ZXN0LmV4YW1wbGUuY29tMB4XDTI2MDIwOTE2NTE1MVoXDTI3MDIwOTE2NTE1MVowHTEbMBkGA1UEAwwSKi50ZXN0LmV4YW1wbGUuY29tMIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAsm1zK4Iw+fTwHAAwhVkAEKaaA6Fx3qWk7ynfiLnnKAvRJif7qfQzezbuNncVt108D0sSNL5mt8kiV+59YGKXk/BIvBE7GFU6nw4iDQpzlS2pT4tr3iaOEuIo9xfGjzEp1re9VospTjbZW5XpJZscM6V07XZS9UkKVnOGVbclxowEnW4GbyDsSGUHqwHbtSjGpbE9albAD0u8cjtYFHcyylDDxexp74uNCePPGHOdxg3/J/LqS+VSaiSiafXJyRJKCNZ3ty60c8rCLhqhnsHLC9M2Uvl1UnHSZ3fe/Ithl5GkKc8q1DPZMKHHzkC6gb9cI6KtQPHv7r/b/0e6zvkUFQIDAQABo4GFMIGCMB0GA1UdDgQWBBQbhDkEig1PthSGhTNvz/19Rz1gcTAfBgNVHSMEGDAWgBQbhDkEig1PthSGhTNvz/19Rz1gcTAPBgNVHRMBAf8EBTADAQH/MC8GA1UdEQQoMCaCEioudGVzdC5leGFtcGxlLmNvbYIQdGVzdC5leGFtcGxlLmNvbTANBgkqhkiG9w0BAQsFAAOCAQEAB/U4vRkd4ojLvNPcSouSNNqQbV5EyvzZzKFgTLjHwUnHzXJNL2ImhYvdsmmIfh+dcnijuOeA6dHgoJXDowyNkSrc+1nB0XMKI0U/cU6p621RRgM8A8S0ebSvyrdPenwVeOfkb8pKyxYbyA2lc5/A5GBC3UMSq0jNLdsxezXhv/IIh6PbJHJE9tjBJBqldBAveQaSxX9JKYXoOivCWyHenLrxDHmPql5ClPiKn4iR8SVf4+dhwinqszI9w2Qu/KHRwVVBzCH7Pd3GvTwVC/pVG2aAPJsHuAZDc1Lj0X1l2HehiznlqsZUYA5ih5O6vXEU0Vqj5pz6cVy/PfjfyobphjEA"
+      # No password for this cert
+
+  trustedRootCertificates:
+    - name: nginx-root
+      # Root certificate for backend HTTPS validation
+      data: "LS0tLS1CRUdJTiBDRVJUSUZJQ0FURS0tLS0tCk1JSURUakNDQWphZ0F3SUJBZ0lVTnBnMjFiWDk4anlSRGxaUStybnUwWkI4Rno4d0RRWUpLb1pJaHZjTkFRRUwKQlFBd0hURWJNQmtHQTFVRUF3d1NLaTUwWlhOMExtVjRZVzF3YkdVdVkyOXRNQjRYRFRJMk1ESXdPVEUyTlRFMQpNVm9YRFRJM01ESXdPVEUyTlRFMU1Wb3dIVEViTUJrR0ExVUVBd3dTS2k1MFpYTjBMbVY0WVcxd2JHVXVZMjl0Ck1JSUJJakFOQmdrcWhraUc5dzBCQVFFRkFBT0NBUThBTUlJQkNnS0NBUUVBc20xeks0SXcrZlR3SEFBd2hWa0EKRUthYUE2RngzcVdrN3luZmlMbm5LQXZSSmlmN3FmUXplemJ1Tm5jVnQxMDhEMHNTTkw1bXQ4a2lWKzU5WUdLWAprL0JJdkJFN0dGVTZudzRpRFFwemxTMnBUNHRyM2lhT0V1SW85eGZHanpFcDFyZTlWb3NwVGpiWlc1WHBKWnNjCk02VjA3WFpTOVVrS1ZuT0dWYmNseG93RW5XNEdieURzU0dVSHF3SGJ0U2pHcGJFOWFsYkFEMHU4Y2p0WUZIY3kKeWxERHhleHA3NHVOQ2VQUEdIT2R4ZzMvSi9McVMrVlNhaVNpYWZYSnlSSktDTlozdHk2MGM4ckNMaHFobnNITApDOU0yVXZsMVVuSFNaM2ZlL0l0aGw1R2tLYzhxMURQWk1LSEh6a0M2Z2I5Y0k2S3RRUEh2N3IvYi8wZTZ6dmtVCkZRSURBUUFCbzRHRk1JR0NNQjBHQTFVZERnUVdCQlFiaERrRWlnMVB0aFNHaFROdnovMTlSejFnY1RBZkJnTlYKSFNNRUdEQVdnQlFiaERrRWlnMVB0aFNHaFROdnovMTlSejFnY1RBUEJnTlZIUk1CQWY4RUJUQURBUUgvTUM4RwpBMVVkRVFRb01DYUNFaW91ZEdWemRDNWxlR0Z0Y0d4bExtTnZiWUlRZEdWemRDNWxlR0Z0Y0d4bExtTnZiVEFOCkJna3Foa2lHOXcwQkFRc0ZBQU9DQVFFQUIvVTR2UmtkNG9qTHZOUGNTb3VTTk5xUWJWNUV5dnpaektGZ1RMakgKd1VuSHpYSk5MMkltaFl2ZHNtbUlmaCtkY25panVPZUE2ZEhnb0pYRG93eU5rU3JjKzFuQjBYTUtJMFUvY1U2cAo2MjFSUmdNOEE4UzBlYlN2eXJkUGVud1ZlT2ZrYjhwS3l4WWJ5QTJsYzUvQTVHQkMzVU1TcTBqTkxkc3hlelhoCnYvSUloNlBiSkhKRTl0akJKQnFsZEJBdmVRYVN4WDlKS1lYb09pdkNXeUhlbkxyeERIbVBxbDVDbFBpS240aVIKOFNWZjQrZGh3aW5xc3pJOXcyUXUvS0hSd1ZWQnpDSDdQZDNHdlR3VkMvcFZHMmFBUEpzSHVBWkRjMUxqMFgxbAoySGVoaXpubHFzWlVZQTVpaDVPNnZYRVUwVnFqNXB6NmNWeS9QZmpmeW9icGhnPT0KLS0tLS1FTkQgQ0VSVElGSUNBVEUtLS0tLQo="
+
+  probes:
+    - name: k8s-probe
+      protocol: Https
+      host: my.test.example.com
+      port: 443
+      path: /
+      interval: 30
+      timeout: 30
+      unhealthyThreshold: 3
+      pickHostNameFromBackendHttpSettings: false
+      minServers: 0
+      match:
+        body: ""
+        statusCodes:
+          - "200-399"
+
+  backendAddressPools:
+    - name: k8s-backend
+      backendAddresses:
+        - fqdn: my.test.example.com
+
+  backendHttpSettingsCollection:
+    - name: k8s-http-setting
+      port: 443
+      protocol: Https
+      cookieBasedAffinity: Disabled
+      affinityCookieName: ApplicationGatewayAffinity
+      requestTimeout: 30
+      pickHostNameFromBackendAddress: true
+      # Backend connection settings
+      dedicatedBackendConnection: false
+      validateCertChainAndExpiry: true
+      validateSNI: true
+      # Health probe reference
+      probeName: k8s-probe
+      # Trusted root certificates for backend HTTPS
+      trustedRootCertificateNames:
+        - nginx-root
+
+  httpListeners:
+    - name: https-listener
+      frontendIPConfigurationName: public-frontend
+      frontendPortName: https-port
+      protocol: Https
+      hostNames:
+        - "*.test.example.com"
+      requireServerNameIndication: true
+      sslCertificateName: frontend-cert
+      enableHttp3: false
+      customErrorConfigurations: []
+
+  requestRoutingRules:
+    - name: default-rule
+      ruleType: Basic
+      priority: 100
+      httpListenerName: https-listener
+      backendAddressPoolName: k8s-backend
+      backendHttpSettingsName: k8s-http-setting
+
+  sslPolicy:
+    policyType: Predefined
+    policyName: AppGwSslPolicy20220101
+    # This is also the defaultPredefinedSslPolicy
+
+  webApplicationFirewallConfiguration:
+    enabled: true
+    firewallMode: Detection
+    ruleSetType: OWASP
+    ruleSetVersion: "3.2"
+    disabledRuleGroups: []
+    requestBodyCheck: true
+    maxRequestBodySizeInKb: 128
+    fileUploadLimitInMb: 100
+
+  enableHttp2: false
+  enableFips: false
+
+status:
+  # Azure resource ID
+  id: /subscriptions/3f1d2fbd-117a-4742-8bde-6edbcdee6a04/resourceGroups/shoot--spm-test01--va-0232ca--cm/providers/Microsoft.Network/applicationGateways/shoot--spm-test01--va-0232ca-appgw
+
+  # Resource GUID assigned by Azure
+  resourceGuid: 0c70df43-eeb6-4683-92f0-9c8f30c99b6b
+
+  # Provisioning state from Azure
+  provisioningState: Succeeded
+
+  # Operational state
+  operationalState: Running
+
+  # Overall state for K8s
+  state: Ready
+
+  # Observed generation
+  observedGeneration: 1
+
+  # Kubernetes conditions
+  conditions:
+    - type: Ready
+      status: "True"
+      lastTransitionTime: "2026-03-13T00:00:00Z"
+      reason: Provisioned
+      message: Application Gateway is running and ready
+    - type: Provisioned
+      status: "True"
+      lastTransitionTime: "2026-03-13T00:00:00Z"
+      reason: Succeeded
+      message: Azure provisioning completed successfully

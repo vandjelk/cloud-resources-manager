@@ -49,6 +49,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 
+	"k8s.io/utils/clock"
+
 	"github.com/kyma-project/cloud-manager/pkg/common/abstractions"
 	"github.com/kyma-project/cloud-manager/pkg/composed"
 	"github.com/kyma-project/cloud-manager/pkg/feature"
@@ -91,7 +93,6 @@ import (
 	azurerwxvolumebackupclient "github.com/kyma-project/cloud-manager/pkg/skr/azurerwxvolumebackup/client"
 	skrruntime "github.com/kyma-project/cloud-manager/pkg/skr/runtime"
 	"github.com/kyma-project/cloud-manager/pkg/util"
-	"k8s.io/utils/clock"
 
 	cloudcontrolv1beta1 "github.com/kyma-project/cloud-manager/api/cloud-control/v1beta1"
 	cloudresourcesv1beta1 "github.com/kyma-project/cloud-manager/api/cloud-resources/v1beta1"
@@ -307,6 +308,11 @@ func main() {
 
 	if err = cloudresourcescontroller.SetupAwsVpcPeeringReconciler(skrRegistry); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "AwsVpcPeering")
+		os.Exit(1)
+	}
+
+	if err = cloudresourcescontroller.SetupAwsWebAclReconciler(skrRegistry); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "AwsWebAcl")
 		os.Exit(1)
 	}
 

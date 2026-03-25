@@ -160,6 +160,10 @@ var _ = BeforeSuite(func() {
 	Expect(SetupGcpSubnetReconciler(infra.Registry())).
 		NotTo(HaveOccurred())
 
+	// AwsWebAcl
+	Expect(SetupAwsWebAclReconciler(infra.Registry())).
+		NotTo(HaveOccurred())
+
 	migrateFinalizers.RunMigration = false
 
 	// Start controllers

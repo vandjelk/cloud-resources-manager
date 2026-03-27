@@ -31,6 +31,7 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/elasticache v1.51.12
 	github.com/aws/aws-sdk-go-v2/service/secretsmanager v1.41.4
 	github.com/aws/aws-sdk-go-v2/service/sts v1.41.9
+	github.com/aws/aws-sdk-go-v2/service/wafv2 v1.71.2
 	github.com/aws/smithy-go v1.24.2
 	github.com/cucumber/godog v0.15.1
 	github.com/cucumber/messages/go/v21 v21.0.1

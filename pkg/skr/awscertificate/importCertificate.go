@@ -15,9 +15,9 @@ func importCertificate(ctx context.Context, st composed.State) (error, context.C
 	logger := composed.LoggerFromCtx(ctx)
 	cert := state.ObjAsAwsCertificate()
 
-	// Skip if certificate exists and Secret hasn't changed
-	if state.certificateDetail != nil && !state.secretChanged {
-		logger.Info("Certificate already imported and Secret unchanged, skipping import")
+	// Skip if certificate doesn't need update
+	if !state.certificateNeedsUpdate {
+		logger.Info("Certificate update not needed, skipping import")
 		return nil, ctx
 	}
 
@@ -52,20 +52,8 @@ func importCertificate(ctx context.Context, st composed.State) (error, context.C
 			Run(ctx, state.Cluster().K8sClient())
 	}
 
-	// Store ARN in status (will be persisted by updateStatus action)
-	cert.Status.Arn = arn
-
-	// Update secret hash annotation
-	if cert.Annotations == nil {
-		cert.Annotations = make(map[string]string)
-	}
-	cert.Annotations[SecretHashAnnotation] = hashSecretData(state.certificateData)
-
-	// Update object to persist annotation
-	err = state.Cluster().K8sClient().Update(ctx, cert)
-	if err != nil {
-		return composed.LogErrorAndReturn(err, "Error updating AwsCertificate annotations", composed.StopWithRequeue, ctx)
-	}
+	// Store ARN in state (will be used by updateStatus action)
+	state.certificateArn = arn
 
 	logger.Info("Certificate imported to ACM successfully", "arn", arn)
 	return nil, ctx

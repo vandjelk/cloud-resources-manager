@@ -19,9 +19,9 @@ package v1beta1
 import (
 	"github.com/kyma-project/cloud-manager/api/cloud-control/v1beta1"
 	featuretypes "github.com/kyma-project/cloud-manager/pkg/feature/types"
-	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/klog/v2"
 )
 
 // AwsCertificateSpec defines the desired state of AwsCertificate
@@ -30,11 +30,7 @@ type AwsCertificateSpec struct {
 	// Required keys: "tls.crt", "tls.key"
 	// Optional keys: "ca.crt" (certificate chain)
 	// +kubebuilder:validation:Required
-	SecretRef corev1.LocalObjectReference `json:"secretRef"`
-
-	// SecretNamespace is the namespace where the Secret is located
-	// +kubebuilder:validation:Required
-	SecretNamespace string `json:"secretNamespace"`
+	SecretRef klog.ObjectRef `json:"secretRef"`
 }
 
 // AwsCertificateStatus defines the observed state of AwsCertificate
@@ -126,17 +122,6 @@ func (in *AwsCertificate) SetStatusProcessing() {
 		ObservedGeneration: in.Generation,
 		Reason:             v1beta1.ReasonProcessing,
 		Message:            v1beta1.ReasonProcessing,
-	})
-}
-
-func (in *AwsCertificate) SetProviderError(msg string) {
-	in.Status.State = ReasonProviderError
-	meta.SetStatusCondition(&in.Status.Conditions, metav1.Condition{
-		Type:               ConditionTypeReady,
-		Status:             metav1.ConditionFalse,
-		ObservedGeneration: in.Generation,
-		Reason:             ReasonProviderError,
-		Message:            msg,
 	})
 }
 

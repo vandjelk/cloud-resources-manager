@@ -19,12 +19,13 @@ type State struct {
 	awsClientProvider awsclient.SkrClientProvider[certificateclient.Client]
 	env               abstractions.Environment
 
-	awsClient         certificateclient.Client
-	roleName          string
-	secret            *corev1.Secret              // Loaded Secret
-	certificateDetail *acmtypes.CertificateDetail // Loaded from ACM
-	certificateData   *CertificateData            // Parsed from Secret
-	secretChanged     bool                        // True if Secret hash changed
+	awsClient              certificateclient.Client
+	roleName               string
+	secret                 *corev1.Secret              // Loaded Secret
+	certificateDetail      *acmtypes.CertificateDetail // Loaded from ACM
+	certificateData        *CertificateData            // Parsed from Secret
+	certificateNeedsUpdate bool                        // True if certificate data differs
+	certificateArn         string                      // ARN of imported certificate
 }
 
 type CertificateData struct {

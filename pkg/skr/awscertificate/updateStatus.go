@@ -18,6 +18,11 @@ func updateStatus(ctx context.Context, st composed.State) (error, context.Contex
 
 	return composed.NewStatusPatcherComposed(cert).
 		MutateStatus(func(c *cloudresourcesv1beta1.AwsCertificate) {
+			// Set ARN (set by importCertificate in state.certificateArn)
+			if state.certificateArn != "" {
+				c.Status.Arn = state.certificateArn
+			}
+
 			// Update expiration date if certificate detail is loaded
 			if state.certificateDetail != nil {
 				if state.certificateDetail.NotAfter != nil {

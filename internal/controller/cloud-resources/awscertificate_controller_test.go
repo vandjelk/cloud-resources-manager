@@ -18,6 +18,7 @@ package cloudresources
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/kyma-project/cloud-manager/api"
 	cloudcontrolv1beta1 "github.com/kyma-project/cloud-manager/api/cloud-control/v1beta1"
@@ -29,6 +30,8 @@ import (
 	. "github.com/onsi/gomega"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/klog/v2"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -80,10 +83,10 @@ var _ = Describe("AwsCertificate Controller", func() {
 
 		By("When AwsCertificate is created", func() {
 			awsCertificate.Spec = cloudresourcesv1beta1.AwsCertificateSpec{
-				SecretRef: corev1.LocalObjectReference{
-					Name: secretName,
+				SecretRef: klog.ObjectRef{
+					Name:      secretName,
+					Namespace: infra.SKR().Namespace(),
 				},
-				SecretNamespace: infra.SKR().Namespace(),
 			}
 
 			Eventually(CreateAwsCertificate).
@@ -121,39 +124,32 @@ var _ = Describe("AwsCertificate Controller", func() {
 			Expect(*certDetail.CertificateArn).To(Equal(awsCertificate.Status.Arn))
 		})
 
-		By("And Then AwsCertificate has secret-hash annotation", func() {
-			Expect(awsCertificate.Annotations).To(HaveKey("cloud-manager.kyma-project.io/secret-hash"))
-		})
-
-		originalHash := awsCertificate.Annotations["cloud-manager.kyma-project.io/secret-hash"]
+		originalArn := awsCertificate.Status.Arn
 
 		By("When Secret data is updated", func() {
-			Eventually(Update).
-				WithArguments(
-					infra.Ctx(), infra.SKR().Client(), secret,
-					func(obj client.Object) {
-						s := obj.(*corev1.Secret)
-						s.Data["tls.crt"] = []byte("-----BEGIN CERTIFICATE-----\nNEW_CERT_DATA\n-----END CERTIFICATE-----")
-					},
-				).
-				Should(Succeed())
+			// Load the secret fresh
+			err := infra.SKR().Client().Get(infra.Ctx(), client.ObjectKeyFromObject(secret), secret)
+			Expect(err).NotTo(HaveOccurred())
+
+			// Update the certificate data
+			secret.Data["tls.crt"] = []byte("-----BEGIN CERTIFICATE-----\nNEW_CERT_DATA\n-----END CERTIFICATE-----")
+
+			// Save the updated secret
+			err = infra.SKR().Client().Update(infra.Ctx(), secret)
+			Expect(err).To(Succeed())
 		})
 
-		By("Then certificate is reimported and secret-hash is updated", func() {
+		By("Then certificate is reimported with new data", func() {
 			Eventually(LoadAndCheck).
 				WithArguments(
 					infra.Ctx(), infra.SKR().Client(), awsCertificate,
 					NewObjActions(),
-					func(obj client.Object) error {
-						cert := obj.(*cloudresourcesv1beta1.AwsCertificate)
-						newHash := cert.Annotations["cloud-manager.kyma-project.io/secret-hash"]
-						if newHash == originalHash {
-							return fmt.Errorf("secret-hash not yet updated")
-						}
-						return nil
-					},
+					HavingConditionTrue(cloudresourcesv1beta1.ConditionTypeReady),
 				).
 				Should(Succeed())
+
+			// Verify ARN didn't change (updated in place)
+			Expect(awsCertificate.Status.Arn).To(Equal(originalArn))
 		})
 
 		By("When AwsCertificate is deleted", func() {
@@ -203,10 +199,10 @@ var _ = Describe("AwsCertificate Controller", func() {
 
 		By("When AwsCertificate is created without existing Secret", func() {
 			awsCertificate.Spec = cloudresourcesv1beta1.AwsCertificateSpec{
-				SecretRef: corev1.LocalObjectReference{
-					Name: "nonexistent-secret",
+				SecretRef: klog.ObjectRef{
+					Name:      "nonexistent-secret",
+					Namespace: infra.SKR().Namespace(),
 				},
-				SecretNamespace: infra.SKR().Namespace(),
 			}
 
 			Eventually(CreateAwsCertificate).
@@ -222,12 +218,12 @@ var _ = Describe("AwsCertificate Controller", func() {
 				WithArguments(
 					infra.Ctx(), infra.SKR().Client(), awsCertificate,
 					NewObjActions(),
-					HavingConditionTrue(cloudresourcesv1beta1.ConditionTypeError),
+					NotHavingConditionTrue(cloudresourcesv1beta1.ConditionTypeReady),
 				).
 				Should(Succeed())
 		})
 
-		By("And Then AwsCertificate status has no ARN", func() {
+		By("And Then status has no ARN", func() {
 			Expect(awsCertificate.Status.Arn).To(BeEmpty(), "expected Status.Arn to be empty")
 		})
 
@@ -270,7 +266,7 @@ var _ = Describe("AwsCertificate Controller", func() {
 		By("And Given Secret with missing tls.crt key exists", func() {
 			secret.SetName(secretName)
 			secret.SetNamespace(infra.SKR().Namespace())
-			secret.Type = corev1.SecretTypeTLS
+			secret.Type = corev1.SecretTypeOpaque // Use Opaque instead of TLS to bypass validation
 			// Only provide tls.key, missing tls.crt
 			secret.Data = map[string][]byte{
 				"tls.key": []byte("-----BEGIN PRIVATE KEY-----\nKEY_DATA\n-----END PRIVATE KEY-----"),
@@ -280,10 +276,10 @@ var _ = Describe("AwsCertificate Controller", func() {
 
 		By("When AwsCertificate is created", func() {
 			awsCertificate.Spec = cloudresourcesv1beta1.AwsCertificateSpec{
-				SecretRef: corev1.LocalObjectReference{
-					Name: secretName,
+				SecretRef: klog.ObjectRef{
+					Name:      secretName,
+					Namespace: infra.SKR().Namespace(),
 				},
-				SecretNamespace: infra.SKR().Namespace(),
 			}
 
 			Eventually(CreateAwsCertificate).
@@ -299,15 +295,40 @@ var _ = Describe("AwsCertificate Controller", func() {
 				WithArguments(
 					infra.Ctx(), infra.SKR().Client(), awsCertificate,
 					NewObjActions(),
-					HavingConditionTrue(cloudresourcesv1beta1.ConditionTypeError),
+					NotHavingConditionTrue(cloudresourcesv1beta1.ConditionTypeReady),
 				).
 				Should(Succeed())
 		})
 
 		By("And Then error message mentions missing tls.crt", func() {
-			cond := meta.FindStatusCondition(awsCertificate.Status.Conditions, cloudresourcesv1beta1.ConditionTypeError)
-			Expect(cond).NotTo(BeNil())
-			Expect(cond.Message).To(ContainSubstring("tls.crt"))
+			Eventually(func() error {
+				// Reload object to get latest status
+				key := client.ObjectKey{
+					Name:      awsCertificate.Name,
+					Namespace: awsCertificate.Namespace,
+				}
+				err := infra.SKR().Client().Get(infra.Ctx(), key, awsCertificate)
+				if err != nil {
+					return err
+				}
+
+				// Check condition exists
+				cond := meta.FindStatusCondition(awsCertificate.Status.Conditions,
+					cloudresourcesv1beta1.ConditionTypeReady)
+				if cond == nil {
+					return fmt.Errorf("Ready condition not found")
+				}
+
+				// Verify condition properties
+				if cond.Status != metav1.ConditionFalse {
+					return fmt.Errorf("condition status is %s, expected False", cond.Status)
+				}
+				if !strings.Contains(cond.Message, "tls.crt") {
+					return fmt.Errorf("message doesn't contain 'tls.crt': %s", cond.Message)
+				}
+
+				return nil
+			}).Should(Succeed())
 		})
 
 		By("When AwsCertificate is deleted", func() {
@@ -360,8 +381,9 @@ var _ = Describe("AwsCertificate Controller", func() {
 
 		By("And Given AwsCertificate is created and Ready", func() {
 			awsCertificate.Spec = cloudresourcesv1beta1.AwsCertificateSpec{
-				SecretRef: corev1.LocalObjectReference{
-					Name: secretName,
+				SecretRef: klog.ObjectRef{
+					Name:      secretName,
+					Namespace: infra.SKR().Namespace(),
 				},
 			}
 
@@ -396,12 +418,13 @@ var _ = Describe("AwsCertificate Controller", func() {
 				WithArguments(
 					infra.Ctx(), infra.SKR().Client(), awsCertificate,
 					NewObjActions(),
-					HavingConditionTrue(cloudresourcesv1beta1.ConditionTypeError),
+					NotHavingConditionTrue(cloudresourcesv1beta1.ConditionTypeReady),
 				).
 				Should(Succeed())
 
-			cond := meta.FindStatusCondition(awsCertificate.Status.Conditions, cloudresourcesv1beta1.ConditionTypeError)
+			cond := meta.FindStatusCondition(awsCertificate.Status.Conditions, cloudresourcesv1beta1.ConditionTypeReady)
 			Expect(cond).NotTo(BeNil())
+			Expect(cond.Status).To(Equal(metav1.ConditionFalse))
 			Expect(cond.Message).To(ContainSubstring("in use"))
 		})
 

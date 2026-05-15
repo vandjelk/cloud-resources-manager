@@ -11,6 +11,7 @@ import (
 	"github.com/aws/smithy-go"
 	"github.com/google/uuid"
 	awsclient "github.com/kyma-project/cloud-manager/pkg/kcp/provider/aws/client"
+	awsutil "github.com/kyma-project/cloud-manager/pkg/kcp/provider/aws/util"
 	"github.com/kyma-project/cloud-manager/pkg/util"
 	"k8s.io/utils/ptr"
 )
@@ -23,8 +24,10 @@ type CertificateConfig interface {
 }
 
 type certificateEntry struct {
-	detail *acmtypes.CertificateDetail
-	inUse  bool
+	detail           *acmtypes.CertificateDetail
+	inUse            bool
+	certificate      []byte // The actual certificate PEM
+	certificateChain []byte // The certificate chain PEM
 }
 
 type certificateStore struct {
@@ -69,7 +72,7 @@ func (s *certificateStore) ImportCertificate(ctx context.Context, input *acm.Imp
 	} else {
 		// Create new certificate
 		id := uuid.NewString()
-		arn = fmt.Sprintf("arn:aws:acm:%s:%s:certificate/%s", s.region, s.account, id)
+		arn = awsutil.CertificateArn(s.region, s.account, id)
 		entry = &certificateEntry{
 			detail: &acmtypes.CertificateDetail{
 				CertificateArn: ptr.To(arn),
@@ -86,6 +89,12 @@ func (s *certificateStore) ImportCertificate(ctx context.Context, input *acm.Imp
 	entry.detail.ImportedAt = ptr.To(time.Now())
 	entry.detail.NotBefore = ptr.To(time.Now())
 	entry.detail.NotAfter = ptr.To(time.Now().Add(365 * 24 * time.Hour)) // 1 year expiration
+
+	// Store the certificate and chain data
+	entry.certificate = input.Certificate
+	if input.CertificateChain != nil {
+		entry.certificateChain = input.CertificateChain
+	}
 
 	// Deep copy to avoid shared references
 	detailCopy, err := util.JsonClone(entry.detail)
@@ -149,6 +158,25 @@ func (s *certificateStore) DeleteCertificate(ctx context.Context, arn string) er
 	return nil
 }
 
+func (s *certificateStore) GetCertificate(ctx context.Context, arn string) (string, string, error) {
+	s.m.Lock()
+	defer s.m.Unlock()
+
+	if err, ok := s.errorMap[arn]; ok && err != nil {
+		return "", "", err
+	}
+
+	entry, ok := s.items[arn]
+	if !ok {
+		return "", "", &smithy.GenericAPIError{
+			Code:    "ResourceNotFoundException",
+			Message: fmt.Sprintf("Certificate with ARN %s does not exist", arn),
+		}
+	}
+
+	return string(entry.certificate), string(entry.certificateChain), nil
+}
+
 func (s *certificateStore) SetCertificateError(arn string, err error) {
 	s.m.Lock()
 	defer s.m.Unlock()
@@ -170,6 +198,7 @@ func (s *certificateStore) InitiateCertificate(arn string, cert []byte, key []by
 			NotBefore:      ptr.To(time.Now()),
 			NotAfter:       ptr.To(time.Now().Add(365 * 24 * time.Hour)),
 		},
+		certificate: cert,
 	}
 
 	s.items[arn] = entry

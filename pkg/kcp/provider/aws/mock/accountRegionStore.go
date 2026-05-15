@@ -77,3 +77,7 @@ func (s *accountRegionStore) DescribeCertificate(ctx context.Context, arn string
 func (s *accountRegionStore) DeleteCertificate(ctx context.Context, arn string) error {
 	return s.certificateStore.DeleteCertificate(ctx, arn)
 }
+
+func (s *accountRegionStore) GetCertificate(ctx context.Context, arn string) (string, string, error) {
+	return s.certificateStore.GetCertificate(ctx, arn)
+}

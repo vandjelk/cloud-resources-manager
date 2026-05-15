@@ -17,7 +17,7 @@ func loadSecret(ctx context.Context, st composed.State) (error, context.Context)
 
 	secret := &corev1.Secret{}
 	err := state.Cluster().K8sClient().Get(ctx, types.NamespacedName{
-		Namespace: cert.Spec.SecretNamespace,
+		Namespace: cert.Spec.SecretRef.Namespace,
 		Name:      cert.Spec.SecretRef.Name,
 	}, secret)
 	if err != nil {

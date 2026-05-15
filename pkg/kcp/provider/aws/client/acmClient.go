@@ -11,6 +11,7 @@ import (
 type AcmClient interface {
 	ImportCertificate(ctx context.Context, input *acm.ImportCertificateInput) (string, error)
 	DescribeCertificate(ctx context.Context, arn string) (*acmtypes.CertificateDetail, error)
+	GetCertificate(ctx context.Context, arn string) (certificate string, certificateChain string, err error)
 	DeleteCertificate(ctx context.Context, arn string) error
 }
 
@@ -54,4 +55,20 @@ func (c *acmClient) DeleteCertificate(ctx context.Context, arn string) error {
 
 	_, err := c.svc.DeleteCertificate(ctx, in)
 	return err
+}
+
+func (c *acmClient) GetCertificate(ctx context.Context, arn string) (string, string, error) {
+	in := &acm.GetCertificateInput{
+		CertificateArn: ptr.To(arn),
+	}
+
+	out, err := c.svc.GetCertificate(ctx, in)
+	if err != nil {
+		return "", "", err
+	}
+
+	certificate := ptr.Deref(out.Certificate, "")
+	certificateChain := ptr.Deref(out.CertificateChain, "")
+
+	return certificate, certificateChain, nil
 }

@@ -165,7 +165,7 @@ var _ = BeforeSuite(func() {
 		infra.KcpManager(),
 		infra.ActiveSkrCollection(),
 		infra.GcpMock().FileBackupClientProvider(),
-		awsnukeclient.Mock(),
+		infra.AwsMock().NukeProvider(),
 		azurenukeclient.NukeProvider(infra.AzureMock().StorageProvider()),
 		env,
 	)).To(Succeed())

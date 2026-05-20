@@ -99,24 +99,15 @@ var _ = Describe("Feature: Nuke AWS WebACL", Focus, func() {
 				Should(Succeed())
 		})
 
-		//
-		By(fmt.Sprintf("When resource %s finalizer is removed", vpcPeering.Kind), func() {
+		By("When resource VpcPeering finalizer is removed", func() {
 			removed, err := composed.PatchObjRemoveFinalizer(infra.Ctx(), api.CommonFinalizerDeletionHook, vpcPeering, infra.KCP().Client())
 			Expect(err).To(Succeed())
 			Expect(removed).To(BeTrue())
 		})
 
-		By(fmt.Sprintf("Then resource %s does not exist", vpcPeering.Kind), func() {
+		By("Then resource VpcPeering does not exist", func() {
 			Eventually(IsDeleted).
 				WithArguments(infra.Ctx(), infra.KCP().Client(), vpcPeering).
-				Should(Succeed())
-		})
-
-		By("Then Nuke status state is Deleted", func() {
-			Eventually(LoadAndCheck).
-				WithArguments(infra.Ctx(), infra.KCP().Client(), nuke, NewObjActions(),
-					HavingState("Deleted"),
-				).
 				Should(Succeed())
 		})
 

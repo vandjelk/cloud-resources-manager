@@ -84,10 +84,10 @@ func (s *webAclStore) CreateWebACL(ctx context.Context, input *wafv2.CreateWebAC
 	}
 
 	webAcl := types.WebACL{
-		Id:                   new(id),
-		Name:                 new(name),
-		ARN:                  new(arn),
-		Description:          new(description),
+		Id:                   &id,
+		Name:                 &name,
+		ARN:                  &arn,
+		Description:          &description,
 		DefaultAction:        defaultActionCopy,
 		Rules:                rulesCopy,
 		VisibilityConfig:     visibilityConfigCopy,
@@ -144,7 +144,7 @@ func (s *webAclStore) GetWebACL(ctx context.Context, name, id string, scope type
 
 func (s *webAclStore) findWebAclEntry(name, id string) (*webAclEntry, error) {
 	for _, x := range s.items {
-		if ptr.Equal(x.webAcl.Id, new(id)) || ptr.Equal(x.webAcl.Name, new(name)) {
+		if ptr.Equal(x.webAcl.Id, &id) || ptr.Equal(x.webAcl.Name, &name) {
 			return x, nil
 		}
 	}
@@ -219,7 +219,7 @@ func (s *webAclStore) DeleteWebACL(ctx context.Context, name, id string, scope t
 
 	deleted := false
 	for _, x := range s.items {
-		if ptr.Equal(x.webAcl.Id, new(id)) {
+		if ptr.Equal(x.webAcl.Id, &id) {
 			if x.lockToken != lockToken {
 				return &smithy.GenericAPIError{
 					Code:    "WAFOptimisticLockException",
@@ -239,7 +239,7 @@ func (s *webAclStore) DeleteWebACL(ctx context.Context, name, id string, scope t
 	}
 
 	s.items = pie.Filter(s.items, func(x *webAclEntry) bool {
-		return !ptr.Equal(x.webAcl.Id, new(id))
+		return !ptr.Equal(x.webAcl.Id, &id)
 	})
 
 	return nil
@@ -255,7 +255,7 @@ func (s *webAclStore) ListWebACLs(ctx context.Context, scope types.Scope) ([]typ
 			Name:        e.webAcl.Name,
 			ARN:         e.webAcl.ARN,
 			Description: e.webAcl.Description,
-			LockToken:   new(e.lockToken),
+			LockToken:   &e.lockToken,
 		}
 	})
 
@@ -280,9 +280,9 @@ func (s *webAclStore) InitiateWebAcl(id, name string, scope types.Scope) {
 
 	item := &webAclEntry{
 		webAcl: types.WebACL{
-			Id:       new(id),
-			Name:     new(name),
-			ARN:      new(arn),
+			Id:       &id,
+			Name:     &name,
+			ARN:      &arn,
 			Capacity: 100,
 		},
 		lockToken: lockToken,
@@ -305,6 +305,28 @@ func (s *webAclStore) GetWebAclTags(arn string) []types.Tag {
 	}
 
 	return nil
+}
+
+func (s *webAclStore) ListTagsForWebACL(ctx context.Context, resourceArn string) ([]types.Tag, error) {
+	s.m.Lock()
+	defer s.m.Unlock()
+
+	// Find entry by ARN
+	for _, entry := range s.items {
+		if entry.webAcl.ARN != nil && *entry.webAcl.ARN == resourceArn {
+			// Return a copy of tags to avoid external modifications
+			tagsCopy, err := util.JsonClone(entry.tags)
+			if err != nil {
+				return nil, err
+			}
+			return tagsCopy, nil
+		}
+	}
+
+	return nil, &smithy.GenericAPIError{
+		Code:    "WAFNonexistentItemException",
+		Message: fmt.Sprintf("WebACL with ARN %s does not exist", resourceArn),
+	}
 }
 
 func (s *webAclStore) WafClient() awsclient.Wafv2Client {

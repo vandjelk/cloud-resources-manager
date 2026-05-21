@@ -19,7 +19,7 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-var _ = Describe("Feature: Nuke AWS WebACL", Focus, func() {
+var _ = Describe("Feature: Nuke AWS WebACL", func() {
 
 	It("Scenario: KCP Nuke deletes AWS WebACL resources", func() {
 		const kymaName = "6ff4e8g3-ge8f-5829-bce3-gg0g6894g1ge"

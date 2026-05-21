@@ -81,3 +81,15 @@ func (s *accountRegionStore) DeleteCertificate(ctx context.Context, arn string) 
 func (s *accountRegionStore) GetCertificate(ctx context.Context, arn string) (string, string, error) {
 	return s.certificateStore.GetCertificate(ctx, arn)
 }
+
+func (s *accountRegionStore) ListCertificates(ctx context.Context) ([]acmtypes.CertificateSummary, error) {
+	return s.certificateStore.ListCertificates(ctx)
+}
+
+func (s *accountRegionStore) ListCertificateTags(ctx context.Context, arn string) ([]acmtypes.Tag, error) {
+	return s.certificateStore.ListCertificateTags(ctx, arn)
+}
+
+func (s *accountRegionStore) ListTagsForWebACL(ctx context.Context, resourceArn string) ([]wafv2types.Tag, error) {
+	return s.webAclStore.ListTagsForWebACL(ctx, resourceArn)
+}

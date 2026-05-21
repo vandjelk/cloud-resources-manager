@@ -124,6 +124,31 @@ var _ = Describe("AwsCertificate Controller", func() {
 			Expect(*certDetail.CertificateArn).To(Equal(awsCertificate.Status.Arn))
 		})
 
+		By("And Then certificate has correct tags", func() {
+			tags := awsMockLocal.GetCertificateTags(awsCertificate.Status.Arn)
+			Expect(tags).NotTo(BeNil(), "expected certificate to have tags")
+
+			// Convert tags to map for easier verification
+			tagMap := make(map[string]string)
+			for _, tag := range tags {
+				if tag.Key != nil && tag.Value != nil {
+					tagMap[*tag.Key] = *tag.Value
+				}
+			}
+
+			// Verify Name tag
+			Expect(tagMap).To(HaveKeyWithValue("Name", objName))
+
+			// Verify ManagedBy tag
+			Expect(tagMap).To(HaveKeyWithValue("kyma-project.io/managed-by", "cloud-manager"))
+
+			// Verify Scope tag
+			Expect(tagMap).To(HaveKeyWithValue("cloud-manager.kyma-project.io/scope", scopeName))
+
+			// Verify Shoot tag
+			Expect(tagMap).To(HaveKeyWithValue("cloud-manager.kyma-project.io/shoot", scope.Spec.ShootName))
+		})
+
 		originalArn := awsCertificate.Status.Arn
 
 		By("When Secret data is updated", func() {

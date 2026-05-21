@@ -20,14 +20,16 @@ type CertificateConfig interface {
 	SetCertificateError(arn string, err error)
 	InitiateCertificate(arn string, cert []byte, key []byte)
 	GetCertificateByArn(arn string) *acmtypes.CertificateDetail
+	GetCertificateTags(arn string) []acmtypes.Tag
 	SetCertificateInUse(arn string, inUse bool)
 }
 
 type certificateEntry struct {
 	detail           *acmtypes.CertificateDetail
 	inUse            bool
-	certificate      []byte // The actual certificate PEM
-	certificateChain []byte // The certificate chain PEM
+	certificate      []byte         // The actual certificate PEM
+	certificateChain []byte         // The certificate chain PEM
+	tags             []acmtypes.Tag // Tags associated with the certificate
 }
 
 type certificateStore struct {
@@ -94,6 +96,11 @@ func (s *certificateStore) ImportCertificate(ctx context.Context, input *acm.Imp
 	entry.certificate = input.Certificate
 	if input.CertificateChain != nil {
 		entry.certificateChain = input.CertificateChain
+	}
+
+	// Store tags if provided
+	if input.Tags != nil {
+		entry.tags = input.Tags
 	}
 
 	// Deep copy to avoid shared references
@@ -224,6 +231,21 @@ func (s *certificateStore) SetCertificateInUse(arn string, inUse bool) {
 	if entry, ok := s.items[arn]; ok {
 		entry.inUse = inUse
 	}
+}
+
+func (s *certificateStore) GetCertificateTags(arn string) []acmtypes.Tag {
+	s.m.Lock()
+	defer s.m.Unlock()
+
+	entry, ok := s.items[arn]
+	if !ok {
+		return nil
+	}
+
+	// Return a copy of tags to avoid external modifications
+	tagsCopy := make([]acmtypes.Tag, len(entry.tags))
+	copy(tagsCopy, entry.tags)
+	return tagsCopy
 }
 
 func (s *certificateStore) AcmClient() awsclient.AcmClient {

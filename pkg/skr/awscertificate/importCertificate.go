@@ -5,7 +5,9 @@ import (
 
 	"github.com/aws/aws-sdk-go-v2/service/acm"
 	acmtypes "github.com/aws/aws-sdk-go-v2/service/acm/types"
+	cloudcontrolv1beta1 "github.com/kyma-project/cloud-manager/api/cloud-control/v1beta1"
 	cloudresourcesv1beta1 "github.com/kyma-project/cloud-manager/api/cloud-resources/v1beta1"
+	"github.com/kyma-project/cloud-manager/pkg/common"
 	"github.com/kyma-project/cloud-manager/pkg/composed"
 	"k8s.io/utils/ptr"
 )
@@ -27,7 +29,7 @@ func importCertificate(ctx context.Context, st composed.State) (error, context.C
 	input := &acm.ImportCertificateInput{
 		Certificate: state.certificateData.Certificate,
 		PrivateKey:  state.certificateData.PrivateKey,
-		Tags:        convertTags(cert),
+		Tags:        convertTags(cert, state.Scope()),
 	}
 
 	// Add certificate ARN if updating existing certificate
@@ -59,7 +61,7 @@ func importCertificate(ctx context.Context, st composed.State) (error, context.C
 	return nil, ctx
 }
 
-func convertTags(cert *cloudresourcesv1beta1.AwsCertificate) []acmtypes.Tag {
+func convertTags(cert *cloudresourcesv1beta1.AwsCertificate, scope *cloudcontrolv1beta1.Scope) []acmtypes.Tag {
 	tags := []acmtypes.Tag{
 		{
 			Key:   ptr.To("Name"),
@@ -68,6 +70,14 @@ func convertTags(cert *cloudresourcesv1beta1.AwsCertificate) []acmtypes.Tag {
 		{
 			Key:   ptr.To("kyma-project.io/managed-by"),
 			Value: ptr.To("cloud-manager"),
+		},
+		{
+			Key:   ptr.To(common.TagScope),
+			Value: &scope.Name,
+		},
+		{
+			Key:   ptr.To(common.TagShoot),
+			Value: &scope.Spec.ShootName,
 		},
 	}
 

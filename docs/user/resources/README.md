@@ -108,3 +108,9 @@ The `azurerediscluster.cloud-resources.kyma-project.io` CRD describes the Micros
 ### AzureVpcDnsLink CR [**Beta feature**]
 
 The `azurevpcdnslink.cloud-resources.kyma-project.io` CRD describes the Azure VPC DNS link between Kyma network and the remote Azure Private DNS. For more information, see [AzureVpcDnsLink Custom Resource](./04-40-40-azure-vpc-dns-link.md).
+
+## Certificate Resources
+
+### AwsCertificate CR
+
+The `awscertificate.cloud-resources.kyma-project.io` CRD describes the import of SSL/TLS certificates into AWS Certificate Manager (ACM). For more information, see [AwsCertificate Custom Resource](./04-70-10-aws-certificate.md).

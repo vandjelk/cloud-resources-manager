@@ -5,6 +5,7 @@ export default [
     { text: 'Authorizing Cloud Manager in the Remote Cloud Provider', link: './00-31-vpc-peering-authorization' }
     ] },
   { text: 'Redis', link: './00-40-redis' },
+  { text: 'AWS Certificate', link: './00-70-aws-certificate' },
   { text: 'Resources', link: './resources/README', collapsed: true, items: [
     { text: 'IpRange Custom Resource', link: './resources/04-10-iprange' },
     { text: 'AwsNfsVolume Custom Resource', link: './resources/04-20-10-aws-nfs-volume' },
@@ -27,7 +28,8 @@ export default [
     { text: 'GcpSubnet Custom Resource', link: './resources/04-50-21-gcp-subnet' },
     { text: 'AzureRedisCluster Custom Resource', link: './resources/04-50-30-azure-redis-cluster' },
     { text: 'SapNfsVolume Custom Resource', link: './resources/04-20-50-sap-nfs-volume' },
-    { text: 'AzureVpcDnsLink Custom Resource', link: './resources/04-40-40-azure-vpc-dns-link' }
+    { text: 'AzureVpcDnsLink Custom Resource', link: './resources/04-40-40-azure-vpc-dns-link' },
+    { text: 'AwsCertificate Custom Resource', link: './resources/04-70-10-aws-certificate' }
     ] },
   { text: 'Tutorials', link: './tutorials/README', collapsed: true, items: [
     { text: 'Using NFS in Amazon Web Services', link: './tutorials/01-20-10-aws-nfs-volume' },
@@ -42,7 +44,8 @@ export default [
     { text: 'Using GcpRedisCluster Custom Resources', link: './tutorials/01-50-20-gcp-redis-cluster' },
     { text: 'Using AzureRedisCluster Custom Resources', link: './tutorials/01-50-30-azure-redis-cluster' },
     { text: 'Linking Your Kyma Network to Microsoft Azure Private DNS Zone', link: './tutorials/01-60-10-azure-dns-zone-vpc-link'},
-    { text: 'Linking Your Kyma Network to Microsoft Azure DNS Private Resolver', link: './tutorials/01-60-20-azure-dns-resolver-vpc-link'}
+    { text: 'Linking Your Kyma Network to Microsoft Azure DNS Private Resolver', link: './tutorials/01-60-20-azure-dns-resolver-vpc-link'},
+    { text: 'Using AwsCertificate Custom Resources', link: './tutorials/01-70-10-aws-certificate' }
     ] },
   { text: 'Glossary', link: './00-10-glossary' }
 ];

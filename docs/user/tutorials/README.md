@@ -26,3 +26,5 @@ Browse the Cloud Manager tutorials to learn how to create and use cloud resource
 * VPC DNS Link
   * [Linking Your Kyma Network to Microsoft Azure Private DNS Zone](01-60-10-azure-dns-zone-vpc-link.md) [**Beta feature**]
   * [Linking Your Kyma Network to Microsoft Azure DNS Private Resolver](01-60-20-azure-dns-resolver-vpc-link.md) [**Beta feature**]
+* Certificate
+  * [Using AwsCertificate Custom Resources](./01-70-10-aws-certificate.md)

@@ -1,0 +1,342 @@
+# Example: AWS WebACL with Option A - Separate CRD Only
+# Pure Option A: All statements are separate AwsWebAclStatement CRDs
+# No inline statement library - maximum reusability and clean separation
+
+---
+# Statement 1: High-risk countries
+apiVersion: cloud-resources.kyma-project.io/v1beta1
+kind: AwsWebAclStatement
+metadata:
+  name: high-risk-countries
+spec:
+  geoMatch:
+    countryCodes: ["CN", "RU", "KP"]
+
+---
+# Statement 2: Admin path matching
+apiVersion: cloud-resources.kyma-project.io/v1beta1
+kind: AwsWebAclStatement
+metadata:
+  name: admin-path-match
+spec:
+  byteMatch:
+    searchString: "/admin"
+    positionalConstraint: STARTS_WITH
+    fieldToMatch:
+      uriPath: {}
+    textTransformations:
+      - priority: 0
+        type: LOWERCASE
+
+---
+# Statement 3: API path matching
+apiVersion: cloud-resources.kyma-project.io/v1beta1
+kind: AwsWebAclStatement
+metadata:
+  name: api-path-match
+spec:
+  byteMatch:
+    searchString: "/api"
+    positionalConstraint: STARTS_WITH
+    fieldToMatch:
+      uriPath: {}
+    textTransformations:
+      - priority: 0
+        type: LOWERCASE
+
+---
+# Statement 4: Internal API path
+apiVersion: cloud-resources.kyma-project.io/v1beta1
+kind: AwsWebAclStatement
+metadata:
+  name: internal-api-path
+spec:
+  byteMatch:
+    searchString: "/api/internal"
+    positionalConstraint: STARTS_WITH
+    fieldToMatch:
+      uriPath: {}
+    textTransformations:
+      - priority: 0
+        type: LOWERCASE
+
+---
+# Statement 5: NOT internal (logical operator)
+apiVersion: cloud-resources.kyma-project.io/v1beta1
+kind: AwsWebAclStatement
+metadata:
+  name: not-internal-api
+spec:
+  not:
+    statementRef:
+      name: internal-api-path
+
+---
+# Statement 6: API but not internal (AND logic)
+apiVersion: cloud-resources.kyma-project.io/v1beta1
+kind: AwsWebAclStatement
+metadata:
+  name: api-not-internal
+spec:
+  and:
+    statementRefs:
+      - name: api-path-match
+      - name: not-internal-api
+
+---
+# Statement 7: Admin from high-risk countries (AND logic)
+apiVersion: cloud-resources.kyma-project.io/v1beta1
+kind: AwsWebAclStatement
+metadata:
+  name: admin-from-high-risk
+spec:
+  and:
+    statementRefs:
+      - name: admin-path-match
+      - name: high-risk-countries
+
+---
+# Statement 8: Corporate IP allowlist (future - requires AwsIPSet)
+apiVersion: cloud-resources.kyma-project.io/v1beta1
+kind: AwsWebAclStatement
+metadata:
+  name: corporate-ip-allowlist
+spec:
+  ipSetReference:
+    name: corporate-ips
+
+---
+# Statement 9: Rate limit scoped to API (rateBased with scopeDown)
+apiVersion: cloud-resources.kyma-project.io/v1beta1
+kind: AwsWebAclStatement
+metadata:
+  name: rate-limit-api
+spec:
+  rateBased:
+    limit: 2000
+    aggregateKeyType: IP
+    evaluationWindowSec: 300
+    scopeDownStatementRef: api-not-internal  # Reference another statement
+
+---
+# WebACL using Option A - External statements only
+apiVersion: cloud-resources.kyma-project.io/v1beta1
+kind: AwsWebAcl
+metadata:
+  name: production-webacl-option-a
+spec:
+  defaultAction:
+    allow: {}
+
+  description: "Production WebACL using Option A - separate CRD statements only"
+
+  visibilityConfig:
+    cloudWatchMetricsEnabled: true
+    metricName: production-option-a-waf
+    sampledRequestsEnabled: true
+
+  customResponseBodies:
+    blocked:
+      contentType: TEXT_HTML
+      content: |
+        <html>
+          <head><title>Access Denied</title></head>
+          <body><h1>Access Denied</h1><p>Your request was blocked by our security system.</p></body>
+        </html>
+
+  rules:
+    # Rule 1: Allow corporate IPs (references external AwsWebAclStatement)
+    - name: allow-corporate-ips
+      priority: 0
+      action:
+        allow: {}
+      statementRef:
+        name: corporate-ip-allowlist
+
+    # Rule 2: Block admin access from high-risk countries
+    - name: block-admin-high-risk
+      priority: 5
+      action:
+        block:
+          customResponse:
+            responseCode: 403
+            customResponseBodyKey: blocked
+      statementRef:
+        name: admin-from-high-risk
+      ruleLabels:
+        - name: "security:geo-block"
+        - name: "severity:high"
+
+    # Rule 3: Managed rule group with scopeDownStatement
+    - name: aws-common-rules-api-only
+      priority: 10
+      overrideAction:
+        none: {}
+      statements:
+        - managedRuleGroup:
+            vendorName: AWS
+            name: AWSManagedRulesCommonRuleSet
+            # Scope managed rules to non-internal API only
+            scopeDownStatementRef: api-not-internal
+
+    # Rule 4: Rate limit (references statement with rateBased + scopeDown)
+    - name: rate-limit-api-traffic
+      priority: 20
+      action:
+        block: {}
+      statementRef:
+        name: rate-limit-api
+
+    # Rule 5: Traditional inline ManagedRuleGroup (MVP backward compatible)
+    - name: aws-sqli-rules
+      priority: 30
+      overrideAction:
+        count: {}  # Monitoring mode
+      statements:
+        - managedRuleGroup:
+            vendorName: AWS
+            name: AWSManagedRulesSQLiRuleSet
+            excludedRules:
+              - name: SQLi_QUERYARGUMENTS
+
+---
+# Example: Unlimited nesting depth with Option A
+# Level 1: Leaf statements
+apiVersion: cloud-resources.kyma-project.io/v1beta1
+kind: AwsWebAclStatement
+metadata:
+  name: level1-us-geo
+spec:
+  geoMatch:
+    countryCodes: ["US"]
+
+---
+apiVersion: cloud-resources.kyma-project.io/v1beta1
+kind: AwsWebAclStatement
+metadata:
+  name: level1-uk-geo
+spec:
+  geoMatch:
+    countryCodes: ["GB"]
+
+---
+# Level 2: Combine level 1 statements
+apiVersion: cloud-resources.kyma-project.io/v1beta1
+kind: AwsWebAclStatement
+metadata:
+  name: level2-us-or-uk
+spec:
+  or:
+    statementRefs:
+      - name: level1-us-geo
+      - name: level1-uk-geo
+
+---
+apiVersion: cloud-resources.kyma-project.io/v1beta1
+kind: AwsWebAclStatement
+metadata:
+  name: level2-admin-path
+spec:
+  byteMatch:
+    searchString: "/admin"
+    positionalConstraint: STARTS_WITH
+    fieldToMatch:
+      uriPath: {}
+    textTransformations:
+      - priority: 0
+        type: LOWERCASE
+
+---
+# Level 3: Combine level 2 statements
+apiVersion: cloud-resources.kyma-project.io/v1beta1
+kind: AwsWebAclStatement
+metadata:
+  name: level3-admin-from-us-or-uk
+spec:
+  and:
+    statementRefs:
+      - name: level2-admin-path
+      - name: level2-us-or-uk
+
+---
+# Level 4: Negate level 3
+apiVersion: cloud-resources.kyma-project.io/v1beta1
+kind: AwsWebAclStatement
+metadata:
+  name: level4-not-admin-us-uk
+spec:
+  not:
+    statementRef:
+      name: level3-admin-from-us-or-uk
+
+---
+# Level 5+: Can continue indefinitely!
+apiVersion: cloud-resources.kyma-project.io/v1beta1
+kind: AwsWebAclStatement
+metadata:
+  name: level5-complex-logic
+spec:
+  or:
+    statementRefs:
+      - name: level4-not-admin-us-uk
+      - name: high-risk-countries
+
+---
+# WebACL using deeply nested statements
+apiVersion: cloud-resources.kyma-project.io/v1beta1
+kind: AwsWebAcl
+metadata:
+  name: complex-nested-webacl
+spec:
+  defaultAction:
+    allow: {}
+
+  visibilityConfig:
+    cloudWatchMetricsEnabled: true
+    metricName: complex-nested
+    sampledRequestsEnabled: true
+
+  rules:
+    - name: complex-nested-rule
+      priority: 0
+      action:
+        block: {}
+      statementRef:
+        name: level5-complex-logic  # Deep nesting resolved at runtime!
+
+---
+# MVP Example - Backward compatible (no changes needed)
+apiVersion: cloud-resources.kyma-project.io/v1beta1
+kind: AwsWebAcl
+metadata:
+  name: mvp-webacl-backward-compatible
+spec:
+  defaultAction:
+    allow: {}
+
+  description: "MVP WebACL - backward compatible (no Option A features)"
+
+  visibilityConfig:
+    cloudWatchMetricsEnabled: true
+    metricName: mvp-waf
+    sampledRequestsEnabled: true
+
+  rules:
+    # Traditional inline ManagedRuleGroup (MVP)
+    - name: aws-common-rules
+      priority: 0
+      statements:
+        - managedRuleGroup:
+            vendorName: AWS
+            name: AWSManagedRulesCommonRuleSet
+
+    - name: aws-known-bad-inputs
+      priority: 1
+      overrideAction:
+        none: {}
+      statements:
+        - managedRuleGroup:
+            vendorName: AWS
+            name: AWSManagedRulesKnownBadInputsRuleSet
+            excludedRules:
+              - name: ExploitablePaths_URIPATH

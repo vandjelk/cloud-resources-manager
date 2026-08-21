@@ -1,6 +1,7 @@
 package awswebacl
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -8,6 +9,7 @@ import (
 	cloudcontrolv1beta1 "github.com/kyma-project/cloud-manager/api/cloud-control/v1beta1"
 	cloudresourcesv1beta1 "github.com/kyma-project/cloud-manager/api/cloud-resources/v1beta1"
 	"github.com/kyma-project/cloud-manager/pkg/common"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 func convertDefaultAction(action cloudresourcesv1beta1.AwsWebAclDefaultAction) (*wafv2types.DefaultAction, error) {
@@ -34,14 +36,14 @@ func convertDefaultAction(action cloudresourcesv1beta1.AwsWebAclDefaultAction) (
 	return nil, fmt.Errorf("defaultAction must have either allow or block set")
 }
 
-func convertRules(rules []cloudresourcesv1beta1.AwsWebAclRule) ([]wafv2types.Rule, error) {
+func convertRules(ctx context.Context, kcpClient client.Client, rules []cloudresourcesv1beta1.AwsWebAclRule) ([]wafv2types.Rule, error) {
 	if len(rules) == 0 {
 		return nil, nil
 	}
 
 	result := make([]wafv2types.Rule, 0, len(rules))
 	for _, rule := range rules {
-		wafRule, err := convertRule(rule)
+		wafRule, err := convertRule(ctx, kcpClient, rule)
 		if err != nil {
 			return nil, fmt.Errorf("error converting rule %s: %w", rule.Name, err)
 		}
@@ -50,8 +52,8 @@ func convertRules(rules []cloudresourcesv1beta1.AwsWebAclRule) ([]wafv2types.Rul
 	return result, nil
 }
 
-func convertRule(rule cloudresourcesv1beta1.AwsWebAclRule) (*wafv2types.Rule, error) {
-	statement, err := convertRuleStatement(&rule)
+func convertRule(ctx context.Context, kcpClient client.Client, rule cloudresourcesv1beta1.AwsWebAclRule) (*wafv2types.Rule, error) {
+	statement, err := convertRuleStatement(ctx, kcpClient, &rule)
 	if err != nil {
 		return nil, err
 	}

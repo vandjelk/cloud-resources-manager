@@ -32,7 +32,7 @@ func createWebAcl(ctx context.Context, st composed.State) (error, context.Contex
 			Run(ctx, state.Cluster().K8sClient())
 	}
 
-	rules, err := convertRules(webAcl.Spec.Rules)
+	rules, err := convertRules(ctx, state.Cluster().K8sClient(), webAcl.Spec.Rules)
 	if err != nil {
 		return composed.NewStatusPatcherComposed(webAcl).
 			MutateStatus(func(acl *cloudresourcesv1beta1.AwsWebAcl) {

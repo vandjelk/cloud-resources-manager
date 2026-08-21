@@ -32,7 +32,7 @@ func checkUpdateNeeded(ctx context.Context, st composed.State) (error, context.C
 		return nil, ctx
 	}
 
-	rules, err := convertRules(webAcl.Spec.Rules)
+	rules, err := convertRules(ctx, state.Cluster().K8sClient(), webAcl.Spec.Rules)
 	if err != nil {
 		state.updateNeeded = false
 		return nil, ctx

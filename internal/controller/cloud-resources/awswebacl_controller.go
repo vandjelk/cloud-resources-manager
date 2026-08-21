@@ -26,6 +26,8 @@ import (
 	skrruntime "github.com/kyma-project/cloud-manager/pkg/skr/runtime"
 	reconcile2 "github.com/kyma-project/cloud-manager/pkg/skr/runtime/reconcile"
 	ctrl "sigs.k8s.io/controller-runtime"
+	ctrlclient "sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
@@ -48,26 +50,33 @@ type AwsWebAclReconciler struct {
 //+kubebuilder:rbac:groups=cloud-resources.kyma-project.io,resources=awswebacls,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=cloud-resources.kyma-project.io,resources=awswebacls/status,verbs=get;update;patch
 //+kubebuilder:rbac:groups=cloud-resources.kyma-project.io,resources=awswebacls/finalizers,verbs=update
+//+kubebuilder:rbac:groups=cloud-resources.kyma-project.io,resources=awswebaclstatements,verbs=get;list;watch
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
-// TODO(user): Modify the Reconcile function to compare the state specified by
-// the AwsWebAcl object against the actual cluster state, and then
-// perform operations to make the cluster state reflect the state specified by
-// the user.
-//
-// For more details, check Reconcile and its Result here:
-// - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.16.0/pkg/reconcile
 func (r *AwsWebAclReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	return r.reconciler.Reconcile(ctx, req)
 }
 
 func SetupAwsWebAclReconciler(reg skrruntime.SkrRegistry, provider awsclient.SkrClientProvider[client.Client], env abstractions.Environment) error {
+	factory := &AwsWebAclReconcilerFactory{
+		webAclProvider: provider,
+		env:            env,
+	}
+
 	return reg.Register().
-		WithFactory(&AwsWebAclReconcilerFactory{
-			webAclProvider: provider,
-			env:            env,
-		}).
+		WithFactory(factory).
 		For(&cloudresourcesv1beta1.AwsWebAcl{}).
+		Watches(&cloudresourcesv1beta1.AwsWebAclStatement{},
+			handler.EnqueueRequestsFromMapFunc(func(ctx context.Context, obj ctrlclient.Object) []reconcile.Request {
+				// TODO: Implement statement change handling
+				// When a statement changes, we should reconcile all WebACLs that reference it.
+				// For now, returning empty means statements won't trigger WebACL reconciliation.
+				// Users must manually trigger reconciliation by updating the WebACL resource.
+				// To implement: use handler.Funcs pattern (see gcpnfsvolume/pvEventHandler.go)
+				// and list all WebACLs, filtering by those that reference this statement.
+				return []reconcile.Request{}
+			}),
+		).
 		Complete()
 }

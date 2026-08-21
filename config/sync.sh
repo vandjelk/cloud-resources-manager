@@ -26,6 +26,7 @@ cp $SCRIPT_DIR/crd/bases/cloud-resources.kyma-project.io_awsnfsbackupschedules.y
 cp $SCRIPT_DIR/crd/bases/cloud-resources.kyma-project.io_awsnfsvolumerestores.yaml $SCRIPT_DIR/dist/skr/crd/bases/providers/aws
 cp $SCRIPT_DIR/crd/bases/cloud-resources.kyma-project.io_awscertificates.yaml $SCRIPT_DIR/dist/skr/crd/bases/providers/aws
 cp $SCRIPT_DIR/crd/bases/cloud-resources.kyma-project.io_awswebacls.yaml $SCRIPT_DIR/dist/skr/crd/bases/providers/aws
+cp $SCRIPT_DIR/crd/bases/cloud-resources.kyma-project.io_awswebaclstatements.yaml $SCRIPT_DIR/dist/skr/crd/bases/providers/aws
 
 # AWS UI
 cp $SCRIPT_DIR/ui-extensions/awsnfsvolumes/cloud-resources.kyma-project.io_awsnfsvolumes_ui.yaml $SCRIPT_DIR/dist/skr/crd/bases/providers/aws

@@ -121,7 +121,6 @@ type AwsWebAclSpec struct {
 }
 
 // AwsWebAclRule defines a single rule in the WebACL
-// +kubebuilder:validation:XValidation:rule="size(self.statements) == 1",message="Rule must have exactly 1 statement (ManagedRuleGroup only)"
 type AwsWebAclRule struct {
 	// Name must be unique within the WebACL
 	// +kubebuilder:validation:Required
@@ -135,19 +134,43 @@ type AwsWebAclRule struct {
 	// +kubebuilder:validation:Minimum=0
 	Priority int32 `json:"priority"`
 
-	// OverrideAction for managed rule groups (defaults to None if not specified)
+	// Action for regular rules (mutually exclusive with OverrideAction)
+	// +optional
+	Action *AwsWebAclRuleAction `json:"action,omitempty"`
+
+	// OverrideAction for managed rule groups (mutually exclusive with Action)
 	// +optional
 	OverrideAction *AwsWebAclOverrideAction `json:"overrideAction,omitempty"`
 
-	// Statements - Single ManagedRuleGroup statement
+	// StatementRef - Reference to external AwsWebAclStatement CRD by name
 	// +kubebuilder:validation:Required
-	// +kubebuilder:validation:MinItems=1
-	// +kubebuilder:validation:MaxItems=1
-	Statements []AwsWebAclStatement `json:"statements"`
+	StatementRef *AwsWebAclStatementReference `json:"statementRef"`
 
 	// VisibilityConfig for rule-specific metrics
 	// +optional
 	VisibilityConfig *AwsWebAclVisibilityConfig `json:"visibilityConfig,omitempty"`
+
+	// RuleLabels to apply when rule matches
+	// +optional
+	// +kubebuilder:validation:MaxItems=100
+	RuleLabels []AwsWebAclRuleLabel `json:"ruleLabels,omitempty"`
+
+	// CaptchaConfig - Override global CAPTCHA immunity time for this rule
+	// +optional
+	CaptchaConfig *AwsWebAclCaptchaConfig `json:"captchaConfig,omitempty"`
+
+	// ChallengeConfig - Override global Challenge immunity time for this rule
+	// +optional
+	ChallengeConfig *AwsWebAclChallengeConfig `json:"challengeConfig,omitempty"`
+}
+
+// AwsWebAclRuleLabel - Label to apply when rule matches
+type AwsWebAclRuleLabel struct {
+	// Name - Label name (namespace:label format recommended)
+	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=1024
+	Name string `json:"name"`
 }
 
 // AwsWebAclRuleAction represents the action to take when a rule matches
@@ -212,52 +235,6 @@ type AwsWebAclNoneAction struct {
 	// No fields - empty struct
 }
 
-// AwsWebAclStatement - Individual match condition (ManagedRuleGroup only)
-type AwsWebAclStatement struct {
-	// ManagedRuleGroup - Use AWS-managed rule sets
-	// +kubebuilder:validation:Required
-	ManagedRuleGroup *AwsWebAclManagedRuleGroupStatement `json:"managedRuleGroup"`
-}
-
-// +kubebuilder:validation:XValidation:rule="self.vendorName == 'AWS' && (self.name == 'AWSManagedRulesCommonRuleSet' || self.name == 'AWSManagedRulesKnownBadInputsRuleSet' || self.name == 'AWSManagedRulesSQLiRuleSet' || self.name == 'AWSManagedRulesLinuxRuleSet' || self.name == 'AWSManagedRulesUnixRuleSet')", message="Only free AWS managed rules are supported: AWSManagedRulesCommonRuleSet, AWSManagedRulesKnownBadInputsRuleSet, AWSManagedRulesSQLiRuleSet, AWSManagedRulesLinuxRuleSet, AWSManagedRulesUnixRuleSet. Paid AWS rules and marketplace vendor rules require subscriptions in the service provider's AWS account."
-type AwsWebAclManagedRuleGroupStatement struct {
-	// VendorName (typically "AWS" for AWS managed rules)
-	// +kubebuilder:validation:Required
-	VendorName string `json:"vendorName"`
-
-	// Name of the managed rule group
-	// Common AWS managed rules:
-	// - AWSManagedRulesCommonRuleSet
-	// - AWSManagedRulesKnownBadInputsRuleSet
-	// - AWSManagedRulesSQLiRuleSet
-	// - AWSManagedRulesLinuxRuleSet
-	// - AWSManagedRulesUnixRuleSet
-	// +kubebuilder:validation:Required
-	Name string `json:"name"`
-
-	// Version of the rule group (optional, uses latest if not specified)
-	// +optional
-	Version string `json:"version,omitempty"`
-
-	// ExcludedRules to disable specific rules within the managed group
-	// +optional
-	ExcludedRules []AwsWebAclExcludedRule `json:"excludedRules,omitempty"`
-
-	// RuleActionOverrides to override actions for specific rules
-	// +optional
-	RuleActionOverrides []AwsWebAclRuleActionOverride `json:"ruleActionOverrides,omitempty"`
-}
-
-type AwsWebAclRuleActionOverride struct {
-	// Name of the rule to override
-	// +kubebuilder:validation:Required
-	Name string `json:"name"`
-
-	// ActionToUse to replace the original action
-	// +kubebuilder:validation:Required
-	ActionToUse *AwsWebAclRuleAction `json:"actionToUse"`
-}
-
 type AwsWebAclCustomResponseBody struct {
 	// ContentType - Response content type
 	// +kubebuilder:validation:Required
@@ -284,12 +261,6 @@ type AwsWebAclChallengeConfig struct {
 	// +kubebuilder:validation:Minimum=60
 	// +kubebuilder:validation:Maximum=259200
 	ImmunityTime int64 `json:"immunityTime"`
-}
-
-type AwsWebAclExcludedRule struct {
-	// Name of the rule to exclude from the managed rule group
-	// +kubebuilder:validation:Required
-	Name string `json:"name"`
 }
 
 type AwsWebAclVisibilityConfig struct {

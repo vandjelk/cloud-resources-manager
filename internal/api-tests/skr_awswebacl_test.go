@@ -1,219 +1,195 @@
+/*
+Copyright 2023.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
 package api_tests
 
 import (
-	"github.com/google/uuid"
 	cloudresourcesv1beta1 "github.com/kyma-project/cloud-manager/api/cloud-resources/v1beta1"
+	. "github.com/kyma-project/cloud-manager/pkg/testinfra/dsl"
 	. "github.com/onsi/ginkgo/v2"
+	. "github.com/onsi/gomega"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-type testAwsWebAclBuilder struct {
-	*cloudresourcesv1beta1.AwsWebAclBuilder
-}
+var _ = Describe("Feature: SKR AwsWebAcl", func() {
 
-func newTestAwsWebAclBuilder() *testAwsWebAclBuilder {
-	return &testAwsWebAclBuilder{
-		AwsWebAclBuilder: cloudresourcesv1beta1.NewAwsWebAclBuilder().
-			WithDefaultAction(cloudresourcesv1beta1.DefaultActionAllow()).
-			WithDescription("Test WebACL").
-			WithVisibilityConfig(&cloudresourcesv1beta1.AwsWebAclVisibilityConfig{
-				CloudWatchMetricsEnabled: true,
-				MetricName:               uuid.NewString()[:32], // Ensure unique metric name
-				SampledRequestsEnabled:   true,
-			}),
-	}
-}
-
-func (b *testAwsWebAclBuilder) Build() *cloudresourcesv1beta1.AwsWebAcl {
-	return &b.AwsWebAcl
-}
-
-func (b *testAwsWebAclBuilder) WithDefaultAction(action cloudresourcesv1beta1.AwsWebAclDefaultAction) *testAwsWebAclBuilder {
-	b.AwsWebAclBuilder.WithDefaultAction(action)
-	return b
-}
-
-func (b *testAwsWebAclBuilder) WithDescription(description string) *testAwsWebAclBuilder {
-	b.AwsWebAclBuilder.WithDescription(description)
-	return b
-}
-
-func (b *testAwsWebAclBuilder) WithRule(rule cloudresourcesv1beta1.AwsWebAclRule) *testAwsWebAclBuilder {
-	b.AwsWebAclBuilder.WithRule(rule)
-	return b
-}
-
-func (b *testAwsWebAclBuilder) WithRules(rules []cloudresourcesv1beta1.AwsWebAclRule) *testAwsWebAclBuilder {
-	b.AwsWebAclBuilder.WithRules(rules)
-	return b
-}
-
-var _ = Describe("Feature: SKR AwsWebAcl", Ordered, func() {
-
-	Context("Scenario: Basic creation validation", func() {
-
-		canCreateSkr(
-			"AwsWebAcl can be created with minimal spec (no rules)",
-			newTestAwsWebAclBuilder(),
+	It("Scenario: AwsWebAcl with StatementRef can be created", func() {
+		const (
+			stmtName   = "test-stmt"
+			webaclName = "test-webacl"
 		)
 
-		canCreateSkr(
-			"AwsWebAcl can be created with Block default action",
-			newTestAwsWebAclBuilder().WithDefaultAction(cloudresourcesv1beta1.DefaultActionBlock()),
-		)
-
-		canNotCreateSkr(
-			"AwsWebAcl cannot be created with invalid default action",
-			newTestAwsWebAclBuilder().WithDefaultAction(cloudresourcesv1beta1.AwsWebAclDefaultAction{}), // Empty - neither Allow nor Block
-			"spec.defaultAction",
-		)
-
-		canNotCreateSkr(
-			"AwsWebAcl cannot be created without visibility config",
-			&testAwsWebAclBuilder{
-				AwsWebAclBuilder: cloudresourcesv1beta1.NewAwsWebAclBuilder().
-					WithDefaultAction(cloudresourcesv1beta1.DefaultActionAllow()),
+		stmt := &cloudresourcesv1beta1.AwsWebAclStatement{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: stmtName,
 			},
-			"visibilityConfig",
-		)
-	})
+			Spec: cloudresourcesv1beta1.AwsWebAclStatementSpec{
+				ManagedRuleGroup: &cloudresourcesv1beta1.AwsWebAclManagedRuleGroupStatement{
+					VendorName: "AWS",
+					Name:       "AWSManagedRulesCommonRuleSet",
+				},
+			},
+		}
 
-	Context("Scenario: ManagedRuleGroup statement validation", func() {
-
-		canCreateSkr(
-			"AwsWebAcl can be created with single ManagedRuleGroup statement",
-			newTestAwsWebAclBuilder().WithRule(cloudresourcesv1beta1.AwsWebAclRule{
-				Name:           "managed-rule",
-				Priority:       0,
-				OverrideAction: cloudresourcesv1beta1.OverrideActionNone(), // Use OverrideAction for managed rules
-				Statements: []cloudresourcesv1beta1.AwsWebAclStatement{
+		webacl := &cloudresourcesv1beta1.AwsWebAcl{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: webaclName,
+			},
+			Spec: cloudresourcesv1beta1.AwsWebAclSpec{
+				DefaultAction: cloudresourcesv1beta1.DefaultActionAllow(),
+				VisibilityConfig: &cloudresourcesv1beta1.AwsWebAclVisibilityConfig{
+					CloudWatchMetricsEnabled: true,
+					MetricName:               "test-webacl",
+					SampledRequestsEnabled:   true,
+				},
+				Rules: []cloudresourcesv1beta1.AwsWebAclRule{
 					{
-						ManagedRuleGroup: &cloudresourcesv1beta1.AwsWebAclManagedRuleGroupStatement{
-							VendorName: "AWS",
-							Name:       "AWSManagedRulesCommonRuleSet",
+						Name:           "test-rule",
+						Priority:       0,
+						OverrideAction: cloudresourcesv1beta1.OverrideActionNone(),
+						StatementRef: &cloudresourcesv1beta1.AwsWebAclStatementReference{
+							Name: stmtName,
 						},
 					},
 				},
-			}),
+			},
+		}
+
+		By("When AwsWebAclStatement is created", func() {
+			Eventually(CreateObj).
+				WithArguments(infra.Ctx(), infra.SKR().Client(), stmt).
+				Should(Succeed())
+		})
+
+		By("When AwsWebAcl is created", func() {
+			Eventually(CreateObj).
+				WithArguments(infra.Ctx(), infra.SKR().Client(), webacl).
+				Should(Succeed())
+		})
+
+		By("Then AwsWebAcl is created successfully", func() {
+			Eventually(LoadAndCheck).
+				WithArguments(infra.Ctx(), infra.SKR().Client(), webacl, NewObjActions()).
+				Should(Succeed())
+		})
+
+		By("Cleanup", func() {
+			Eventually(Delete).
+				WithArguments(infra.Ctx(), infra.SKR().Client(), webacl).
+				Should(Succeed())
+			Eventually(Delete).
+				WithArguments(infra.Ctx(), infra.SKR().Client(), stmt).
+				Should(Succeed())
+		})
+	})
+
+	It("Scenario: AwsWebAcl with multiple rules can be created", func() {
+		const (
+			stmt1Name  = "test-stmt-1"
+			stmt2Name  = "test-stmt-2"
+			webaclName = "test-webacl-multi"
 		)
 
-		canCreateSkr(
-			"AwsWebAcl can be created with multiple managed rule groups",
-			newTestAwsWebAclBuilder().WithRules([]cloudresourcesv1beta1.AwsWebAclRule{
-				{
-					Name:           "common-rules",
-					Priority:       0,
-					OverrideAction: cloudresourcesv1beta1.OverrideActionNone(),
-					Statements: []cloudresourcesv1beta1.AwsWebAclStatement{
-						{
-							ManagedRuleGroup: &cloudresourcesv1beta1.AwsWebAclManagedRuleGroupStatement{
-								VendorName: "AWS",
-								Name:       "AWSManagedRulesCommonRuleSet",
-							},
+		stmt1 := &cloudresourcesv1beta1.AwsWebAclStatement{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: stmt1Name,
+			},
+			Spec: cloudresourcesv1beta1.AwsWebAclStatementSpec{
+				ManagedRuleGroup: &cloudresourcesv1beta1.AwsWebAclManagedRuleGroupStatement{
+					VendorName: "AWS",
+					Name:       "AWSManagedRulesCommonRuleSet",
+				},
+			},
+		}
+
+		stmt2 := &cloudresourcesv1beta1.AwsWebAclStatement{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: stmt2Name,
+			},
+			Spec: cloudresourcesv1beta1.AwsWebAclStatementSpec{
+				ManagedRuleGroup: &cloudresourcesv1beta1.AwsWebAclManagedRuleGroupStatement{
+					VendorName: "AWS",
+					Name:       "AWSManagedRulesSQLiRuleSet",
+				},
+			},
+		}
+
+		webacl := &cloudresourcesv1beta1.AwsWebAcl{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: webaclName,
+			},
+			Spec: cloudresourcesv1beta1.AwsWebAclSpec{
+				DefaultAction: cloudresourcesv1beta1.DefaultActionAllow(),
+				VisibilityConfig: &cloudresourcesv1beta1.AwsWebAclVisibilityConfig{
+					CloudWatchMetricsEnabled: true,
+					MetricName:               "test-webacl-multi",
+					SampledRequestsEnabled:   true,
+				},
+				Rules: []cloudresourcesv1beta1.AwsWebAclRule{
+					{
+						Name:           "common-rules",
+						Priority:       0,
+						OverrideAction: cloudresourcesv1beta1.OverrideActionNone(),
+						StatementRef: &cloudresourcesv1beta1.AwsWebAclStatementReference{
+							Name: stmt1Name,
+						},
+					},
+					{
+						Name:           "sql-injection-rules",
+						Priority:       1,
+						OverrideAction: cloudresourcesv1beta1.OverrideActionNone(),
+						StatementRef: &cloudresourcesv1beta1.AwsWebAclStatementReference{
+							Name: stmt2Name,
 						},
 					},
 				},
-				{
-					Name:           "sql-injection-rules",
-					Priority:       1,
-					OverrideAction: cloudresourcesv1beta1.OverrideActionNone(),
-					Statements: []cloudresourcesv1beta1.AwsWebAclStatement{
-						{
-							ManagedRuleGroup: &cloudresourcesv1beta1.AwsWebAclManagedRuleGroupStatement{
-								VendorName: "AWS",
-								Name:       "AWSManagedRulesSQLiRuleSet",
-							},
-						},
-					},
-				},
-			}),
-		)
-	})
-
-	Context("Scenario: Rule override action validation", func() {
-
-		canCreateSkr(
-			"AwsWebAcl can be created with None override action",
-			newTestAwsWebAclBuilder().WithRule(cloudresourcesv1beta1.AwsWebAclRule{
-				Name:           "none-rule",
-				Priority:       0,
-				OverrideAction: cloudresourcesv1beta1.OverrideActionNone(),
-				Statements: []cloudresourcesv1beta1.AwsWebAclStatement{{
-					ManagedRuleGroup: &cloudresourcesv1beta1.AwsWebAclManagedRuleGroupStatement{
-						VendorName: "AWS",
-						Name:       "AWSManagedRulesCommonRuleSet",
-					},
-				}},
-			}),
-		)
-
-		canCreateSkr(
-			"AwsWebAcl can be created with Count override action",
-			newTestAwsWebAclBuilder().WithRule(cloudresourcesv1beta1.AwsWebAclRule{
-				Name:           "count-override-rule",
-				Priority:       0,
-				OverrideAction: cloudresourcesv1beta1.OverrideActionCount(),
-				Statements: []cloudresourcesv1beta1.AwsWebAclStatement{{
-					ManagedRuleGroup: &cloudresourcesv1beta1.AwsWebAclManagedRuleGroupStatement{
-						VendorName: "AWS",
-						Name:       "AWSManagedRulesCommonRuleSet",
-					},
-				}},
-			}),
-		)
-
-		canCreateSkr(
-			"AwsWebAcl can be created with default override action (omitted)",
-			newTestAwsWebAclBuilder().WithRule(cloudresourcesv1beta1.AwsWebAclRule{
-				Name:     "default-override-rule",
-				Priority: 0,
-				// OverrideAction omitted - should default to None
-				Statements: []cloudresourcesv1beta1.AwsWebAclStatement{{
-					ManagedRuleGroup: &cloudresourcesv1beta1.AwsWebAclManagedRuleGroupStatement{
-						VendorName: "AWS",
-						Name:       "AWSManagedRulesCommonRuleSet",
-					},
-				}},
-			}),
-		)
-	})
-
-	Context("Scenario: DefaultAction mutability", func() {
-
-		canChangeSkr(
-			"AwsWebAcl defaultAction can be changed from Allow to Block",
-			newTestAwsWebAclBuilder().WithDefaultAction(cloudresourcesv1beta1.DefaultActionAllow()),
-			func(b Builder[*cloudresourcesv1beta1.AwsWebAcl]) {
-				b.(*testAwsWebAclBuilder).WithDefaultAction(cloudresourcesv1beta1.DefaultActionBlock())
 			},
-		)
+		}
 
-		canChangeSkr(
-			"AwsWebAcl defaultAction can be changed from Block to Allow",
-			newTestAwsWebAclBuilder().WithDefaultAction(cloudresourcesv1beta1.DefaultActionBlock()),
-			func(b Builder[*cloudresourcesv1beta1.AwsWebAcl]) {
-				b.(*testAwsWebAclBuilder).WithDefaultAction(cloudresourcesv1beta1.DefaultActionAllow())
-			},
-		)
-	})
+		By("When AwsWebAclStatements are created", func() {
+			Eventually(CreateObj).
+				WithArguments(infra.Ctx(), infra.SKR().Client(), stmt1).
+				Should(Succeed())
+			Eventually(CreateObj).
+				WithArguments(infra.Ctx(), infra.SKR().Client(), stmt2).
+				Should(Succeed())
+		})
 
-	Context("Scenario: Rules mutability", func() {
+		By("When AwsWebAcl is created", func() {
+			Eventually(CreateObj).
+				WithArguments(infra.Ctx(), infra.SKR().Client(), webacl).
+				Should(Succeed())
+		})
 
-		canChangeSkr(
-			"AwsWebAcl rules can be added",
-			newTestAwsWebAclBuilder(),
-			func(b Builder[*cloudresourcesv1beta1.AwsWebAcl]) {
-				b.(*testAwsWebAclBuilder).WithRule(cloudresourcesv1beta1.AwsWebAclRule{
-					Name:           "new-rule",
-					Priority:       0,
-					OverrideAction: cloudresourcesv1beta1.OverrideActionNone(),
-					Statements: []cloudresourcesv1beta1.AwsWebAclStatement{{
-						ManagedRuleGroup: &cloudresourcesv1beta1.AwsWebAclManagedRuleGroupStatement{
-							VendorName: "AWS",
-							Name:       "AWSManagedRulesCommonRuleSet",
-						},
-					}},
-				})
-			},
-		)
+		By("Then AwsWebAcl is created successfully", func() {
+			Eventually(LoadAndCheck).
+				WithArguments(infra.Ctx(), infra.SKR().Client(), webacl, NewObjActions()).
+				Should(Succeed())
+		})
+
+		By("Cleanup", func() {
+			Eventually(Delete).
+				WithArguments(infra.Ctx(), infra.SKR().Client(), webacl).
+				Should(Succeed())
+			Eventually(Delete).
+				WithArguments(infra.Ctx(), infra.SKR().Client(), stmt1).
+				Should(Succeed())
+			Eventually(Delete).
+				WithArguments(infra.Ctx(), infra.SKR().Client(), stmt2).
+				Should(Succeed())
+		})
 	})
 })

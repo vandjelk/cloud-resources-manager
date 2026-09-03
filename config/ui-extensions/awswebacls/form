@@ -1,4 +1,5 @@
-- path: spec.description
-  name: spec.description
-  widget: Text
-  required: false
+- path: spec.data
+  name: spec.data
+  widget: CodeEditor
+  language: "'plaintext'"
+  required: true

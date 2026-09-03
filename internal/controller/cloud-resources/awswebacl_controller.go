@@ -26,8 +26,6 @@ import (
 	skrruntime "github.com/kyma-project/cloud-manager/pkg/skr/runtime"
 	reconcile2 "github.com/kyma-project/cloud-manager/pkg/skr/runtime/reconcile"
 	ctrl "sigs.k8s.io/controller-runtime"
-	ctrlclient "sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
@@ -50,7 +48,6 @@ type AwsWebAclReconciler struct {
 //+kubebuilder:rbac:groups=cloud-resources.kyma-project.io,resources=awswebacls,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=cloud-resources.kyma-project.io,resources=awswebacls/status,verbs=get;update;patch
 //+kubebuilder:rbac:groups=cloud-resources.kyma-project.io,resources=awswebacls/finalizers,verbs=update
-//+kubebuilder:rbac:groups=cloud-resources.kyma-project.io,resources=awswebaclstatements,verbs=get;list;watch
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
@@ -67,16 +64,5 @@ func SetupAwsWebAclReconciler(reg skrruntime.SkrRegistry, provider awsclient.Skr
 	return reg.Register().
 		WithFactory(factory).
 		For(&cloudresourcesv1beta1.AwsWebAcl{}).
-		Watches(&cloudresourcesv1beta1.AwsWebAclStatement{},
-			handler.EnqueueRequestsFromMapFunc(func(ctx context.Context, obj ctrlclient.Object) []reconcile.Request {
-				// TODO: Implement statement change handling
-				// When a statement changes, we should reconcile all WebACLs that reference it.
-				// For now, returning empty means statements won't trigger WebACL reconciliation.
-				// Users must manually trigger reconciliation by updating the WebACL resource.
-				// To implement: use handler.Funcs pattern (see gcpnfsvolume/pvEventHandler.go)
-				// and list all WebACLs, filtering by those that reference this statement.
-				return []reconcile.Request{}
-			}),
-		).
 		Complete()
 }

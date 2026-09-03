@@ -1,6 +1,7 @@
 en:
-  spec.description: Description
+  spec.data: WebACL Configuration (JSON)
   status.state: State
+  status.arn: ARN
   status.capacity: Capacity
   configuration: Configuration
   status: Status

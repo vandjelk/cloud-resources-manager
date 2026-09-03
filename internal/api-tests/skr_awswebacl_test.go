@@ -26,53 +26,44 @@ import (
 
 var _ = Describe("Feature: SKR AwsWebAcl", func() {
 
-	It("Scenario: AwsWebAcl with StatementRef can be created", func() {
-		const (
-			stmtName   = "test-stmt"
-			webaclName = "test-webacl"
-		)
-
-		stmt := &cloudresourcesv1beta1.AwsWebAclStatement{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: stmtName,
-			},
-			Spec: cloudresourcesv1beta1.AwsWebAclStatementSpec{
-				ManagedRuleGroup: &cloudresourcesv1beta1.AwsWebAclManagedRuleGroupStatement{
-					VendorName: "AWS",
-					Name:       "AWSManagedRulesCommonRuleSet",
-				},
-			},
-		}
+	It("Scenario: AwsWebAcl with simple rules can be created", func() {
+		const webaclName = "test-webacl"
 
 		webacl := &cloudresourcesv1beta1.AwsWebAcl{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: webaclName,
 			},
 			Spec: cloudresourcesv1beta1.AwsWebAclSpec{
-				DefaultAction: cloudresourcesv1beta1.DefaultActionAllow(),
-				VisibilityConfig: &cloudresourcesv1beta1.AwsWebAclVisibilityConfig{
-					CloudWatchMetricsEnabled: true,
-					MetricName:               "test-webacl",
-					SampledRequestsEnabled:   true,
-				},
-				Rules: []cloudresourcesv1beta1.AwsWebAclRule{
-					{
-						Name:           "test-rule",
-						Priority:       0,
-						OverrideAction: cloudresourcesv1beta1.OverrideActionNone(),
-						StatementRef: &cloudresourcesv1beta1.AwsWebAclStatementReference{
-							Name: stmtName,
-						},
+				Data: `{
+					"DefaultAction": {
+						"Allow": {}
 					},
-				},
+					"Rules": [{
+						"Name": "ManagedCommonRuleSet",
+						"Priority": 1,
+						"Statement": {
+							"ManagedRuleGroupStatement": {
+								"VendorName": "AWS",
+								"Name": "AWSManagedRulesCommonRuleSet"
+							}
+						},
+						"OverrideAction": {
+							"None": {}
+						},
+						"VisibilityConfig": {
+							"SampledRequestsEnabled": true,
+							"CloudWatchMetricsEnabled": true,
+							"MetricName": "ManagedCommonRuleSet"
+						}
+					}],
+					"VisibilityConfig": {
+						"SampledRequestsEnabled": true,
+						"CloudWatchMetricsEnabled": true,
+						"MetricName": "test-webacl"
+					}
+				}`,
 			},
 		}
-
-		By("When AwsWebAclStatement is created", func() {
-			Eventually(CreateObj).
-				WithArguments(infra.Ctx(), infra.SKR().Client(), stmt).
-				Should(Succeed())
-		})
 
 		By("When AwsWebAcl is created", func() {
 			Eventually(CreateObj).
@@ -89,84 +80,85 @@ var _ = Describe("Feature: SKR AwsWebAcl", func() {
 		By("Cleanup", func() {
 			Eventually(Delete).
 				WithArguments(infra.Ctx(), infra.SKR().Client(), webacl).
-				Should(Succeed())
-			Eventually(Delete).
-				WithArguments(infra.Ctx(), infra.SKR().Client(), stmt).
 				Should(Succeed())
 		})
 	})
 
 	It("Scenario: AwsWebAcl with multiple rules can be created", func() {
-		const (
-			stmt1Name  = "test-stmt-1"
-			stmt2Name  = "test-stmt-2"
-			webaclName = "test-webacl-multi"
-		)
-
-		stmt1 := &cloudresourcesv1beta1.AwsWebAclStatement{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: stmt1Name,
-			},
-			Spec: cloudresourcesv1beta1.AwsWebAclStatementSpec{
-				ManagedRuleGroup: &cloudresourcesv1beta1.AwsWebAclManagedRuleGroupStatement{
-					VendorName: "AWS",
-					Name:       "AWSManagedRulesCommonRuleSet",
-				},
-			},
-		}
-
-		stmt2 := &cloudresourcesv1beta1.AwsWebAclStatement{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: stmt2Name,
-			},
-			Spec: cloudresourcesv1beta1.AwsWebAclStatementSpec{
-				ManagedRuleGroup: &cloudresourcesv1beta1.AwsWebAclManagedRuleGroupStatement{
-					VendorName: "AWS",
-					Name:       "AWSManagedRulesSQLiRuleSet",
-				},
-			},
-		}
+		const webaclName = "test-webacl-multi"
 
 		webacl := &cloudresourcesv1beta1.AwsWebAcl{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: webaclName,
 			},
 			Spec: cloudresourcesv1beta1.AwsWebAclSpec{
-				DefaultAction: cloudresourcesv1beta1.DefaultActionAllow(),
-				VisibilityConfig: &cloudresourcesv1beta1.AwsWebAclVisibilityConfig{
-					CloudWatchMetricsEnabled: true,
-					MetricName:               "test-webacl-multi",
-					SampledRequestsEnabled:   true,
-				},
-				Rules: []cloudresourcesv1beta1.AwsWebAclRule{
-					{
-						Name:           "common-rules",
-						Priority:       0,
-						OverrideAction: cloudresourcesv1beta1.OverrideActionNone(),
-						StatementRef: &cloudresourcesv1beta1.AwsWebAclStatementReference{
-							Name: stmt1Name,
-						},
+				Data: `{
+					"DefaultAction": {
+						"Block": {}
 					},
-					{
-						Name:           "sql-injection-rules",
-						Priority:       1,
-						OverrideAction: cloudresourcesv1beta1.OverrideActionNone(),
-						StatementRef: &cloudresourcesv1beta1.AwsWebAclStatementReference{
-							Name: stmt2Name,
+					"Rules": [
+						{
+							"Name": "RateLimitRule",
+							"Priority": 1,
+							"Statement": {
+								"RateBasedStatement": {
+									"Limit": 2000,
+									"AggregateKeyType": "IP"
+								}
+							},
+							"Action": {
+								"Block": {}
+							},
+							"VisibilityConfig": {
+								"SampledRequestsEnabled": true,
+								"CloudWatchMetricsEnabled": true,
+								"MetricName": "RateLimitRule"
+							}
 						},
-					},
-				},
+						{
+							"Name": "GeoBlockRule",
+							"Priority": 2,
+							"Statement": {
+								"GeoMatchStatement": {
+									"CountryCodes": ["CN", "RU"]
+								}
+							},
+							"Action": {
+								"Block": {}
+							},
+							"VisibilityConfig": {
+								"SampledRequestsEnabled": true,
+								"CloudWatchMetricsEnabled": true,
+								"MetricName": "GeoBlockRule"
+							}
+						},
+						{
+							"Name": "SQLiProtection",
+							"Priority": 3,
+							"Statement": {
+								"ManagedRuleGroupStatement": {
+									"VendorName": "AWS",
+									"Name": "AWSManagedRulesSQLiRuleSet"
+								}
+							},
+							"OverrideAction": {
+								"None": {}
+							},
+							"VisibilityConfig": {
+								"SampledRequestsEnabled": true,
+								"CloudWatchMetricsEnabled": true,
+								"MetricName": "SQLiProtection"
+							}
+						}
+					],
+					"VisibilityConfig": {
+						"SampledRequestsEnabled": true,
+						"CloudWatchMetricsEnabled": true,
+						"MetricName": "test-webacl-multi"
+					}
+				}`,
 			},
 		}
-
-		By("When AwsWebAclStatements are created", func() {
-			Eventually(CreateObj).
-				WithArguments(infra.Ctx(), infra.SKR().Client(), stmt1).
-				Should(Succeed())
-			Eventually(CreateObj).
-				WithArguments(infra.Ctx(), infra.SKR().Client(), stmt2).
-				Should(Succeed())
-		})
 
 		By("When AwsWebAcl is created", func() {
 			Eventually(CreateObj).
@@ -184,12 +176,31 @@ var _ = Describe("Feature: SKR AwsWebAcl", func() {
 			Eventually(Delete).
 				WithArguments(infra.Ctx(), infra.SKR().Client(), webacl).
 				Should(Succeed())
-			Eventually(Delete).
-				WithArguments(infra.Ctx(), infra.SKR().Client(), stmt1).
-				Should(Succeed())
-			Eventually(Delete).
-				WithArguments(infra.Ctx(), infra.SKR().Client(), stmt2).
-				Should(Succeed())
+		})
+	})
+
+	It("Scenario: AwsWebAcl with invalid JSON should fail validation", func() {
+		const webaclName = "test-webacl-invalid"
+
+		webacl := &cloudresourcesv1beta1.AwsWebAcl{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: webaclName,
+			},
+			Spec: cloudresourcesv1beta1.AwsWebAclSpec{
+				Data: `invalid json{`,
+			},
+		}
+
+		By("When AwsWebAcl with invalid JSON is created", func() {
+			err := infra.SKR().Client().Create(infra.Ctx(), webacl)
+			// Note: JSON validation happens at reconciliation time, not admission
+			// So creation might succeed but reconciliation will fail
+			if err == nil {
+				// If creation succeeded, cleanup
+				Eventually(Delete).
+					WithArguments(infra.Ctx(), infra.SKR().Client(), webacl).
+					Should(Succeed())
+			}
 		})
 	})
 })

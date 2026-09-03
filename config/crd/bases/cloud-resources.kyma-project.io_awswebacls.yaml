@@ -52,424 +52,48 @@ spec:
             spec:
               description: spec defines the desired state of AwsWebAcl
               properties:
-                captchaConfig:
-                  description: CaptchaConfig - Global default CAPTCHA immunity time
-                  properties:
-                    immunityTime:
-                      description: ImmunityTime - Seconds a client is exempt after solving CAPTCHA (60-259200)
-                      format: int64
-                      maximum: 259200
-                      minimum: 60
-                      type: integer
-                  required:
-                    - immunityTime
-                  type: object
-                challengeConfig:
-                  description: ChallengeConfig - Global default Challenge immunity time
-                  properties:
-                    immunityTime:
-                      description: ImmunityTime - Seconds a client is exempt after passing Challenge (60-259200)
-                      format: int64
-                      maximum: 259200
-                      minimum: 60
-                      type: integer
-                  required:
-                    - immunityTime
-                  type: object
-                customResponseBodies:
-                  additionalProperties:
-                    properties:
-                      content:
-                        description: Content - Response body content (max 4,096 bytes per AWS quota)
-                        maxLength: 4096
-                        type: string
-                      contentType:
-                        description: ContentType - Response content type
-                        enum:
-                          - TEXT_PLAIN
-                          - TEXT_HTML
-                          - APPLICATION_JSON
-                        type: string
-                    required:
-                      - content
-                      - contentType
-                    type: object
-                  description: CustomResponseBodies - Custom response content for block actions
-                  type: object
-                defaultAction:
-                  description: DefaultAction specifies what to do when no rules match
-                  maxProperties: 1
-                  minProperties: 1
-                  properties:
-                    allow:
-                      description: Allow action - permit the request
-                      properties:
-                        customRequestHandling:
-                          description: CustomRequestHandling - Insert custom headers into allowed requests
-                          properties:
-                            insertHeaders:
-                              description: InsertHeaders - Headers to insert into the request
-                              items:
-                                properties:
-                                  name:
-                                    description: Name - Header name
-                                    type: string
-                                  value:
-                                    description: Value - Header value
-                                    type: string
-                                required:
-                                  - name
-                                  - value
-                                type: object
-                              maxItems: 100
-                              type: array
-                          required:
-                            - insertHeaders
-                          type: object
-                      type: object
-                    block:
-                      description: Block action - block the request
-                      properties:
-                        customResponse:
-                          description: CustomResponse - Send custom response for blocked requests
-                          properties:
-                            customResponseBodyKey:
-                              description: CustomResponseBodyKey - Reference to custom response body in spec.customResponseBodies
-                              type: string
-                            responseCode:
-                              description: ResponseCode - HTTP status code to return (200-599)
-                              format: int32
-                              maximum: 599
-                              minimum: 200
-                              type: integer
-                            responseHeaders:
-                              description: ResponseHeaders - Custom headers to include in response
-                              items:
-                                properties:
-                                  name:
-                                    description: Name - Header name
-                                    type: string
-                                  value:
-                                    description: Value - Header value
-                                    type: string
-                                required:
-                                  - name
-                                  - value
-                                type: object
-                              maxItems: 100
-                              type: array
-                          required:
-                            - responseCode
-                          type: object
-                      type: object
-                  type: object
-                description:
-                  description: Description provides context about the WebACL purpose
-                  maxLength: 256
+                data:
+                  description: |-
+                    Data contains the complete WebACL configuration in AWS API JSON format.
+                    This should match the structure of AWS WAFv2 CreateWebACLInput/UpdateWebACLInput
+                    excluding the Name and Scope fields which are set automatically.
+
+                    The JSON should include:
+                    - DefaultAction: {"Allow": {}} or {"Block": {}}
+                    - Rules: array of rule definitions
+                    - VisibilityConfig: CloudWatch metrics configuration
+
+                    Example:
+                    {
+                      "DefaultAction": {"Allow": {}},
+                      "Rules": [{
+                        "Name": "RateLimitRule",
+                        "Priority": 1,
+                        "Statement": {
+                          "RateBasedStatement": {
+                            "Limit": 2000,
+                            "AggregateKeyType": "IP"
+                          }
+                        },
+                        "Action": {"Block": {}},
+                        "VisibilityConfig": {
+                          "SampledRequestsEnabled": true,
+                          "CloudWatchMetricsEnabled": true,
+                          "MetricName": "RateLimitRule"
+                        }
+                      }],
+                      "VisibilityConfig": {
+                        "SampledRequestsEnabled": true,
+                        "CloudWatchMetricsEnabled": true,
+                        "MetricName": "MyWebACL"
+                      }
+                    }
+
+                    See: https://docs.aws.amazon.com/waf/latest/APIReference/API_CreateWebACL.html
+                  minLength: 1
                   type: string
-                rules:
-                  description: Rules define the filtering logic (evaluated by priority order)
-                  items:
-                    description: AwsWebAclRule defines a single rule in the WebACL
-                    properties:
-                      action:
-                        description: Action for regular rules (mutually exclusive with OverrideAction)
-                        maxProperties: 1
-                        minProperties: 1
-                        properties:
-                          allow:
-                            description: Allow - Permit the request
-                            properties:
-                              customRequestHandling:
-                                description: CustomRequestHandling - Insert custom headers into allowed requests
-                                properties:
-                                  insertHeaders:
-                                    description: InsertHeaders - Headers to insert into the request
-                                    items:
-                                      properties:
-                                        name:
-                                          description: Name - Header name
-                                          type: string
-                                        value:
-                                          description: Value - Header value
-                                          type: string
-                                      required:
-                                        - name
-                                        - value
-                                      type: object
-                                    maxItems: 100
-                                    type: array
-                                required:
-                                  - insertHeaders
-                                type: object
-                            type: object
-                          block:
-                            description: Block - Block the request
-                            properties:
-                              customResponse:
-                                description: CustomResponse - Send custom response for blocked requests
-                                properties:
-                                  customResponseBodyKey:
-                                    description: CustomResponseBodyKey - Reference to custom response body in spec.customResponseBodies
-                                    type: string
-                                  responseCode:
-                                    description: ResponseCode - HTTP status code to return (200-599)
-                                    format: int32
-                                    maximum: 599
-                                    minimum: 200
-                                    type: integer
-                                  responseHeaders:
-                                    description: ResponseHeaders - Custom headers to include in response
-                                    items:
-                                      properties:
-                                        name:
-                                          description: Name - Header name
-                                          type: string
-                                        value:
-                                          description: Value - Header value
-                                          type: string
-                                      required:
-                                        - name
-                                        - value
-                                      type: object
-                                    maxItems: 100
-                                    type: array
-                                required:
-                                  - responseCode
-                                type: object
-                            type: object
-                          captcha:
-                            description: Captcha - Require CAPTCHA challenge
-                            properties:
-                              customRequestHandling:
-                                description: CustomRequestHandling - Insert custom headers
-                                properties:
-                                  insertHeaders:
-                                    description: InsertHeaders - Headers to insert into the request
-                                    items:
-                                      properties:
-                                        name:
-                                          description: Name - Header name
-                                          type: string
-                                        value:
-                                          description: Value - Header value
-                                          type: string
-                                      required:
-                                        - name
-                                        - value
-                                      type: object
-                                    maxItems: 100
-                                    type: array
-                                required:
-                                  - insertHeaders
-                                type: object
-                            type: object
-                          challenge:
-                            description: Challenge - Require silent challenge (similar to CAPTCHA but without visual puzzle)
-                            properties:
-                              customRequestHandling:
-                                description: CustomRequestHandling - Insert custom headers when challenge token is valid
-                                properties:
-                                  insertHeaders:
-                                    description: InsertHeaders - Headers to insert into the request
-                                    items:
-                                      properties:
-                                        name:
-                                          description: Name - Header name
-                                          type: string
-                                        value:
-                                          description: Value - Header value
-                                          type: string
-                                      required:
-                                        - name
-                                        - value
-                                      type: object
-                                    maxItems: 100
-                                    type: array
-                                required:
-                                  - insertHeaders
-                                type: object
-                            type: object
-                          count:
-                            description: Count - Count the request but don't take action
-                            properties:
-                              customRequestHandling:
-                                description: CustomRequestHandling - Insert custom headers
-                                properties:
-                                  insertHeaders:
-                                    description: InsertHeaders - Headers to insert into the request
-                                    items:
-                                      properties:
-                                        name:
-                                          description: Name - Header name
-                                          type: string
-                                        value:
-                                          description: Value - Header value
-                                          type: string
-                                      required:
-                                        - name
-                                        - value
-                                      type: object
-                                    maxItems: 100
-                                    type: array
-                                required:
-                                  - insertHeaders
-                                type: object
-                            type: object
-                        type: object
-                      captchaConfig:
-                        description: CaptchaConfig - Override global CAPTCHA immunity time for this rule
-                        properties:
-                          immunityTime:
-                            description: ImmunityTime - Seconds a client is exempt after solving CAPTCHA (60-259200)
-                            format: int64
-                            maximum: 259200
-                            minimum: 60
-                            type: integer
-                        required:
-                          - immunityTime
-                        type: object
-                      challengeConfig:
-                        description: ChallengeConfig - Override global Challenge immunity time for this rule
-                        properties:
-                          immunityTime:
-                            description: ImmunityTime - Seconds a client is exempt after passing Challenge (60-259200)
-                            format: int64
-                            maximum: 259200
-                            minimum: 60
-                            type: integer
-                        required:
-                          - immunityTime
-                        type: object
-                      name:
-                        description: Name must be unique within the WebACL
-                        maxLength: 128
-                        minLength: 1
-                        pattern: ^[0-9A-Za-z_-]+$
-                        type: string
-                      overrideAction:
-                        description: OverrideAction for managed rule groups (mutually exclusive with Action)
-                        maxProperties: 1
-                        properties:
-                          count:
-                            description: Count - Override all rules to Count
-                            properties:
-                              customRequestHandling:
-                                description: CustomRequestHandling - Insert custom headers
-                                properties:
-                                  insertHeaders:
-                                    description: InsertHeaders - Headers to insert into the request
-                                    items:
-                                      properties:
-                                        name:
-                                          description: Name - Header name
-                                          type: string
-                                        value:
-                                          description: Value - Header value
-                                          type: string
-                                      required:
-                                        - name
-                                        - value
-                                      type: object
-                                    maxItems: 100
-                                    type: array
-                                required:
-                                  - insertHeaders
-                                type: object
-                            type: object
-                          none:
-                            description: None - Don't override, use the rule group's action (default if OverrideAction is omitted or empty)
-                            type: object
-                        type: object
-                      priority:
-                        description: Priority determines evaluation order (lower numbers evaluated first, must be unique)
-                        format: int32
-                        minimum: 0
-                        type: integer
-                      ruleLabels:
-                        description: RuleLabels to apply when rule matches
-                        items:
-                          description: AwsWebAclRuleLabel - Label to apply when rule matches
-                          properties:
-                            name:
-                              description: Name - Label name (namespace:label format recommended)
-                              maxLength: 1024
-                              minLength: 1
-                              type: string
-                          required:
-                            - name
-                          type: object
-                        maxItems: 100
-                        type: array
-                      statementRef:
-                        description: StatementRef - Reference to external AwsWebAclStatement CRD by name
-                        properties:
-                          name:
-                            description: Name of the AwsWebAclStatement CRD to reference
-                            maxLength: 128
-                            minLength: 1
-                            type: string
-                        required:
-                          - name
-                        type: object
-                      visibilityConfig:
-                        description: VisibilityConfig for rule-specific metrics
-                        properties:
-                          cloudWatchMetricsEnabled:
-                            default: true
-                            description: CloudWatchMetricsEnabled enables CloudWatch metrics
-                            type: boolean
-                          metricName:
-                            description: MetricName for CloudWatch (must be unique)
-                            maxLength: 128
-                            minLength: 1
-                            pattern: ^[0-9A-Za-z_-]+$
-                            type: string
-                          sampledRequestsEnabled:
-                            default: true
-                            description: SampledRequestsEnabled enables request sampling in AWS console
-                            type: boolean
-                        required:
-                          - cloudWatchMetricsEnabled
-                          - sampledRequestsEnabled
-                        type: object
-                    required:
-                      - name
-                      - priority
-                      - statementRef
-                    type: object
-                  maxItems: 100
-                  type: array
-                tokenDomains:
-                  description: TokenDomains - Domains for cross-site CAPTCHA/Challenge token validation
-                  items:
-                    type: string
-                  maxItems: 10
-                  type: array
-                visibilityConfig:
-                  description: VisibilityConfig defines CloudWatch metrics and request sampling
-                  properties:
-                    cloudWatchMetricsEnabled:
-                      default: true
-                      description: CloudWatchMetricsEnabled enables CloudWatch metrics
-                      type: boolean
-                    metricName:
-                      description: MetricName for CloudWatch (must be unique)
-                      maxLength: 128
-                      minLength: 1
-                      pattern: ^[0-9A-Za-z_-]+$
-                      type: string
-                    sampledRequestsEnabled:
-                      default: true
-                      description: SampledRequestsEnabled enables request sampling in AWS console
-                      type: boolean
-                  required:
-                    - cloudWatchMetricsEnabled
-                    - sampledRequestsEnabled
-                  type: object
               required:
-                - defaultAction
-                - visibilityConfig
+                - data
               type: object
             status:
               description: status defines the observed state of AwsWebAcl

@@ -2,6 +2,7 @@ package awswebacl
 
 import (
 	"context"
+	"encoding/json"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/wafv2"
@@ -21,8 +22,10 @@ func createWebAcl(ctx context.Context, st composed.State) (error, context.Contex
 
 	logger.Info("Creating AWS WebACL")
 
-	// Convert spec to AWS types
-	defaultAction, err := convertDefaultAction(webAcl.Spec.DefaultAction)
+	// Parse JSON from spec.data directly into AWS SDK CreateWebACLInput
+	var input wafv2.CreateWebACLInput
+	err := json.Unmarshal([]byte(webAcl.Spec.Data), &input)
+
 	if err != nil {
 		return composed.NewStatusPatcherComposed(webAcl).
 			MutateStatus(func(acl *cloudresourcesv1beta1.AwsWebAcl) {
@@ -32,48 +35,15 @@ func createWebAcl(ctx context.Context, st composed.State) (error, context.Contex
 			Run(ctx, state.Cluster().K8sClient())
 	}
 
-	rules, err := convertRules(ctx, state.Cluster().K8sClient(), webAcl.Spec.Rules)
-	if err != nil {
-		return composed.NewStatusPatcherComposed(webAcl).
-			MutateStatus(func(acl *cloudresourcesv1beta1.AwsWebAcl) {
-				acl.SetStatusProviderError(err.Error())
-			}).
-			OnSuccess(composed.Requeue).
-			Run(ctx, state.Cluster().K8sClient())
-	}
+	// Override immutable fields
+	input.Name = aws.String(webAcl.Name)
+	input.Scope = ScopeRegional()
 
-	visibilityConfig := convertVisibilityConfig(webAcl.Spec.VisibilityConfig, webAcl.Name)
-
-	// Build CreateWebACLInput
-	input := &wafv2.CreateWebACLInput{
-		Name:             aws.String(webAcl.Name),
-		Description:      aws.String(webAcl.Spec.Description),
-		Scope:            ScopeRegional(),
-		DefaultAction:    defaultAction,
-		Rules:            rules,
-		VisibilityConfig: visibilityConfig,
-		Tags:             convertTags(webAcl, state.Scope()),
-	}
-
-	// Add optional fields from state
-	if len(webAcl.Spec.TokenDomains) > 0 {
-		input.TokenDomains = webAcl.Spec.TokenDomains
-	}
-
-	if len(webAcl.Spec.CustomResponseBodies) > 0 {
-		input.CustomResponseBodies = convertCustomResponseBodies(webAcl.Spec.CustomResponseBodies)
-	}
-
-	if webAcl.Spec.CaptchaConfig != nil {
-		input.CaptchaConfig = convertCaptchaConfig(webAcl.Spec.CaptchaConfig)
-	}
-
-	if webAcl.Spec.ChallengeConfig != nil {
-		input.ChallengeConfig = convertChallengeConfig(webAcl.Spec.ChallengeConfig)
-	}
+	// Add Cloud Manager tags
+	input.Tags = convertTags(webAcl, state.Scope())
 
 	// Create WebACL
-	err = state.awsClient.CreateWebACL(ctx, input)
+	err = state.awsClient.CreateWebACL(ctx, &input)
 	if err != nil {
 		logger.Error(err, "Error creating WebACL")
 

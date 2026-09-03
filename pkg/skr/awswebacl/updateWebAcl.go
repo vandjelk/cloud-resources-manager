@@ -2,9 +2,10 @@ package awswebacl
 
 import (
 	"context"
+	"encoding/json"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/wafv2"
-	cloudresourcesv1beta1 "github.com/kyma-project/cloud-manager/api/cloud-resources/v1beta1"
 	"github.com/kyma-project/cloud-manager/pkg/composed"
 )
 
@@ -25,74 +26,42 @@ func updateWebAcl(ctx context.Context, st composed.State) (error, context.Contex
 
 	logger.Info("Updating AWS WebACL")
 
-	// Convert spec to AWS types
-	defaultAction, err := convertDefaultAction(webAcl.Spec.DefaultAction)
-	if err != nil {
-		return composed.NewStatusPatcherComposed(webAcl).
-			MutateStatus(func(acl *cloudresourcesv1beta1.AwsWebAcl) {
-				acl.SetStatusProviderError(err.Error())
-			}).
-			OnSuccess(composed.Requeue).
-			Run(ctx, state.Cluster().K8sClient())
+	// Parse JSON from spec.data directly into AWS SDK CreateWebACLInput
+	var createInput wafv2.CreateWebACLInput
+	if err := json.Unmarshal([]byte(webAcl.Spec.Data), &createInput); err != nil {
+		logger.Error(err, "Failed to parse spec.data as JSON")
+		return composed.LogErrorAndReturn(err, "Error parsing WebACL JSON from spec.data", composed.StopWithRequeue, ctx)
 	}
 
-	rules, err := convertRules(ctx, state.Cluster().K8sClient(), webAcl.Spec.Rules)
-	if err != nil {
-		return composed.NewStatusPatcherComposed(webAcl).
-			MutateStatus(func(acl *cloudresourcesv1beta1.AwsWebAcl) {
-				acl.SetStatusProviderError(err.Error())
-			}).
-			OnSuccess(composed.Requeue).
-			Run(ctx, state.Cluster().K8sClient())
-	}
-
-	visibilityConfig := convertVisibilityConfig(webAcl.Spec.VisibilityConfig, webAcl.Name)
-
-	// Build UpdateWebACLInput
+	// Build UpdateWebACLInput from CreateWebACLInput
 	input := &wafv2.UpdateWebACLInput{
-		Name:             new(webAcl.Name),
-		Id:               state.awsWebAcl.Id,
-		Scope:            ScopeRegional(),
-		DefaultAction:    defaultAction,
-		Rules:            rules,
-		VisibilityConfig: visibilityConfig,
-		LockToken:        new(state.lockToken),
+		Name:                 aws.String(webAcl.Name),
+		Id:                   state.awsWebAcl.Id,
+		Scope:                ScopeRegional(),
+		DefaultAction:        createInput.DefaultAction,
+		Rules:                createInput.Rules,
+		VisibilityConfig:     createInput.VisibilityConfig,
+		CustomResponseBodies: createInput.CustomResponseBodies,
+		TokenDomains:         createInput.TokenDomains,
+		CaptchaConfig:        createInput.CaptchaConfig,
+		ChallengeConfig:      createInput.ChallengeConfig,
+		LockToken:            aws.String(state.lockToken),
 	}
 
-	// Add optional fields from spec
-	if len(webAcl.Spec.TokenDomains) > 0 {
-		input.TokenDomains = webAcl.Spec.TokenDomains
-	}
-
-	if len(webAcl.Spec.CustomResponseBodies) > 0 {
-		input.CustomResponseBodies = convertCustomResponseBodies(webAcl.Spec.CustomResponseBodies)
-	}
-
-	if webAcl.Spec.CaptchaConfig != nil {
-		input.CaptchaConfig = convertCaptchaConfig(webAcl.Spec.CaptchaConfig)
-	}
-
-	if webAcl.Spec.ChallengeConfig != nil {
-		input.ChallengeConfig = convertChallengeConfig(webAcl.Spec.ChallengeConfig)
+	if createInput.Description != nil {
+		input.Description = createInput.Description
 	}
 
 	// Update WebACL
-	err = state.awsClient.UpdateWebACL(ctx, input)
+	err := state.awsClient.UpdateWebACL(ctx, input)
 
 	if err != nil {
 		logger.Error(err, "Error updating WebACL")
-		return composed.NewStatusPatcherComposed(webAcl).
-			MutateStatus(func(acl *cloudresourcesv1beta1.AwsWebAcl) {
-				acl.SetStatusProviderError(err.Error())
-			}).
-			OnSuccess(composed.Requeue).
-			Run(ctx, state.Cluster().K8sClient())
+		return composed.LogErrorAndReturn(err, "Error updating AWS WebACL", composed.StopWithRequeue, ctx)
 	}
 
 	logger.Info("WebACL updated successfully, requeueing to reload")
 
 	// Requeue to reload WebACL with fresh state from AWS
-	// On next reconciliation, loadWebAcl will load the updated WebACL
-	// and checkUpdateNeeded will return false since AWS now matches spec
 	return composed.StopWithRequeue, ctx
 }

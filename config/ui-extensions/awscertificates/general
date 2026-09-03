@@ -6,6 +6,5 @@ urlPath: awscertificates
 name: AWS Certificates
 scope: cluster
 category: Security
-icon: locked
 description: >-
     AWS Certificate Manager (ACM) certificates for secure communications

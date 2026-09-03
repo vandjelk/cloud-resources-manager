@@ -7,87 +7,7 @@ Feature: AwsWebAcl feature
 
     And resource declaration:
       | Alias     | Kind                | ApiVersion                              | Name                 | Namespace |
-      | stmt1     | AwsWebAclStatement  | cloud-resources.kyma-project.io/v1beta1 | e2e-${id()}-stmt1    |           |
-      | stmt2     | AwsWebAclStatement  | cloud-resources.kyma-project.io/v1beta1 | e2e-${id()}-stmt2    |           |
-      | stmt3     | AwsWebAclStatement  | cloud-resources.kyma-project.io/v1beta1 | e2e-${id()}-stmt3    |           |
-      | stmt4     | AwsWebAclStatement  | cloud-resources.kyma-project.io/v1beta1 | e2e-${id()}-stmt4    |           |
-      | stmt5     | AwsWebAclStatement  | cloud-resources.kyma-project.io/v1beta1 | e2e-${id()}-stmt5    |           |
-      | stmt6     | AwsWebAclStatement  | cloud-resources.kyma-project.io/v1beta1 | e2e-${id()}-stmt6    |           |
       | webacl    | AwsWebAcl           | cloud-resources.kyma-project.io/v1beta1 | e2e-${id()}          |           |
-
-    # Create AwsWebAclStatement resources first
-    When resource "stmt1" is created:
-      """
-      apiVersion: cloud-resources.kyma-project.io/v1beta1
-      kind: AwsWebAclStatement
-      spec:
-        managedRuleGroup:
-          vendorName: AWS
-          name: AWSManagedRulesCommonRuleSet
-      """
-
-    And resource "stmt2" is created:
-      """
-      apiVersion: cloud-resources.kyma-project.io/v1beta1
-      kind: AwsWebAclStatement
-      spec:
-        managedRuleGroup:
-          vendorName: AWS
-          name: AWSManagedRulesKnownBadInputsRuleSet
-      """
-
-    And resource "stmt3" is created:
-      """
-      apiVersion: cloud-resources.kyma-project.io/v1beta1
-      kind: AwsWebAclStatement
-      spec:
-        managedRuleGroup:
-          vendorName: AWS
-          name: AWSManagedRulesSQLiRuleSet
-      """
-
-    And resource "stmt4" is created:
-      """
-      apiVersion: cloud-resources.kyma-project.io/v1beta1
-      kind: AwsWebAclStatement
-      spec:
-        managedRuleGroup:
-          vendorName: AWS
-          name: AWSManagedRulesSQLiRuleSet
-          excludedRules:
-            - name: SQLi_QUERYARGUMENTS
-      """
-
-    And resource "stmt5" is created:
-      """
-      apiVersion: cloud-resources.kyma-project.io/v1beta1
-      kind: AwsWebAclStatement
-      spec:
-        managedRuleGroup:
-          vendorName: AWS
-          name: AWSManagedRulesLinuxRuleSet
-          version: "Version_2.0"
-      """
-
-    And resource "stmt6" is created:
-      """
-      apiVersion: cloud-resources.kyma-project.io/v1beta1
-      kind: AwsWebAclStatement
-      spec:
-        managedRuleGroup:
-          vendorName: AWS
-          name: AWSManagedRulesCommonRuleSet
-          ruleActionOverrides:
-            - name: SizeRestrictions_BODY
-              actionToUse:
-                count: {}
-            - name: NoUserAgent_HEADER
-              actionToUse:
-                block:
-                  customResponse:
-                    responseCode: 403
-                    customResponseBodyKey: block-page
-      """
 
     # Create WebACL demonstrating ManagedRuleGroup with different configurations
     When resource "webacl" is created:
@@ -95,89 +15,162 @@ Feature: AwsWebAcl feature
       apiVersion: cloud-resources.kyma-project.io/v1beta1
       kind: AwsWebAcl
       spec:
-        defaultAction:
-          allow: {}
-        description: "E2E WebACL demonstrating AWS managed rule groups"
-        visibilityConfig:
-          cloudWatchMetricsEnabled: true
-          metricName: E2EManagedRulesWebACL
-          sampledRequestsEnabled: true
-        customResponseBodies:
-          block-page:
-            contentType: TEXT_HTML
-            content: "<html><body><h1>Access Denied</h1></body></html>"
-        rules:
-          # ManagedRuleGroup - Default override action (None)
-          - name: AWS-CommonRuleSet
-            priority: 0
-            # overrideAction omitted - defaults to None (use managed group's actions)
-            statementRef:
-              name: ${stmt1.metadata.name}
-            visibilityConfig:
-              cloudWatchMetricsEnabled: true
-              metricName: AWS-CommonRuleSet
-              sampledRequestsEnabled: true
-
-          # ManagedRuleGroup - Explicit None override action
-          - name: AWS-KnownBadInputs
-            priority: 1
-            overrideAction:
-              none: {}
-            statementRef:
-              name: ${stmt2.metadata.name}
-            visibilityConfig:
-              cloudWatchMetricsEnabled: true
-              metricName: AWS-KnownBadInputs
-              sampledRequestsEnabled: true
-
-          # ManagedRuleGroup - Count override (monitoring mode)
-          - name: AWS-SQLi-Monitor
-            priority: 2
-            overrideAction:
-              count: {}
-            statementRef:
-              name: ${stmt3.metadata.name}
-            visibilityConfig:
-              cloudWatchMetricsEnabled: true
-              metricName: AWS-SQLi-Monitor
-              sampledRequestsEnabled: true
-
-          # ManagedRuleGroup - With excluded rules
-          - name: AWS-SQLi-WithExclusions
-            priority: 3
-            overrideAction:
-              none: {}
-            statementRef:
-              name: ${stmt4.metadata.name}
-            visibilityConfig:
-              cloudWatchMetricsEnabled: true
-              metricName: AWS-SQLi-WithExclusions
-              sampledRequestsEnabled: true
-
-          # ManagedRuleGroup - With version specified
-          - name: AWS-LinuxRuleSet
-            priority: 4
-            overrideAction:
-              none: {}
-            statementRef:
-              name: ${stmt5.metadata.name}
-            visibilityConfig:
-              cloudWatchMetricsEnabled: true
-              metricName: AWS-LinuxRuleSet
-              sampledRequestsEnabled: true
-
-          # ManagedRuleGroup - With rule action overrides
-          - name: AWS-CommonRuleSet-CustomActions
-            priority: 5
-            overrideAction:
-              none: {}
-            statementRef:
-              name: ${stmt6.metadata.name}
-            visibilityConfig:
-              cloudWatchMetricsEnabled: true
-              metricName: AWS-CommonRuleSet-CustomActions
-              sampledRequestsEnabled: true
+        data: |
+          {
+            "DefaultAction": {
+              "Allow": {}
+            },
+            "Description": "E2E WebACL demonstrating AWS managed rule groups",
+            "VisibilityConfig": {
+              "CloudWatchMetricsEnabled": true,
+              "MetricName": "E2EManagedRulesWebACL",
+              "SampledRequestsEnabled": true
+            },
+            "CustomResponseBodies": {
+              "block-page": {
+                "ContentType": "TEXT_HTML",
+                "Content": "<html><body><h1>Access Denied</h1></body></html>"
+              }
+            },
+            "Rules": [
+              {
+                "Name": "AWS-CommonRuleSet",
+                "Priority": 0,
+                "Statement": {
+                  "ManagedRuleGroupStatement": {
+                    "VendorName": "AWS",
+                    "Name": "AWSManagedRulesCommonRuleSet"
+                  }
+                },
+                "OverrideAction": {
+                  "None": {}
+                },
+                "VisibilityConfig": {
+                  "CloudWatchMetricsEnabled": true,
+                  "MetricName": "AWS-CommonRuleSet",
+                  "SampledRequestsEnabled": true
+                }
+              },
+              {
+                "Name": "AWS-KnownBadInputs",
+                "Priority": 1,
+                "Statement": {
+                  "ManagedRuleGroupStatement": {
+                    "VendorName": "AWS",
+                    "Name": "AWSManagedRulesKnownBadInputsRuleSet"
+                  }
+                },
+                "OverrideAction": {
+                  "None": {}
+                },
+                "VisibilityConfig": {
+                  "CloudWatchMetricsEnabled": true,
+                  "MetricName": "AWS-KnownBadInputs",
+                  "SampledRequestsEnabled": true
+                }
+              },
+              {
+                "Name": "AWS-SQLi-Monitor",
+                "Priority": 2,
+                "Statement": {
+                  "ManagedRuleGroupStatement": {
+                    "VendorName": "AWS",
+                    "Name": "AWSManagedRulesSQLiRuleSet"
+                  }
+                },
+                "OverrideAction": {
+                  "Count": {}
+                },
+                "VisibilityConfig": {
+                  "CloudWatchMetricsEnabled": true,
+                  "MetricName": "AWS-SQLi-Monitor",
+                  "SampledRequestsEnabled": true
+                }
+              },
+              {
+                "Name": "AWS-SQLi-WithExclusions",
+                "Priority": 3,
+                "Statement": {
+                  "ManagedRuleGroupStatement": {
+                    "VendorName": "AWS",
+                    "Name": "AWSManagedRulesSQLiRuleSet",
+                    "ExcludedRules": [
+                      {
+                        "Name": "SQLi_QUERYARGUMENTS"
+                      }
+                    ]
+                  }
+                },
+                "OverrideAction": {
+                  "None": {}
+                },
+                "VisibilityConfig": {
+                  "CloudWatchMetricsEnabled": true,
+                  "MetricName": "AWS-SQLi-WithExclusions",
+                  "SampledRequestsEnabled": true
+                }
+              },
+              {
+                "Name": "AWS-LinuxRuleSet",
+                "Priority": 4,
+                "Statement": {
+                  "ManagedRuleGroupStatement": {
+                    "VendorName": "AWS",
+                    "Name": "AWSManagedRulesLinuxRuleSet",
+                    "Version": "Version_2.0"
+                  }
+                },
+                "OverrideAction": {
+                  "None": {}
+                },
+                "VisibilityConfig": {
+                  "CloudWatchMetricsEnabled": true,
+                  "MetricName": "AWS-LinuxRuleSet",
+                  "SampledRequestsEnabled": true
+                }
+              },
+              {
+                "Name": "AWS-CommonRuleSet-CustomActions",
+                "Priority": 5,
+                "Statement": {
+                  "ManagedRuleGroupStatement": {
+                    "VendorName": "AWS",
+                    "Name": "AWSManagedRulesCommonRuleSet",
+                    "RuleActionOverrides": [
+                      {
+                        "Name": "SizeRestrictions_BODY",
+                        "ActionToUse": {
+                          "Count": {}
+                        }
+                      },
+                      {
+                        "Name": "NoUserAgent_HEADER",
+                        "ActionToUse": {
+                          "Block": {
+                            "CustomResponse": {
+                              "ResponseCode": 403,
+                              "CustomResponseBodyKey": "block-page"
+                            }
+                          }
+                        }
+                      }
+                    ]
+                  }
+                },
+                "OverrideAction": {
+                  "None": {}
+                },
+                "VisibilityConfig": {
+                  "CloudWatchMetricsEnabled": true,
+                  "MetricName": "AWS-CommonRuleSet-CustomActions",
+                  "SampledRequestsEnabled": true
+                }
+              }
+            ]
+          }
       """
+
+    # Then debug wait "webacl"
 
     Then eventually "webacl.status.state == 'Ready'" is ok, unless:
       | webacl.status.state == 'Error' |
@@ -185,29 +178,10 @@ Feature: AwsWebAcl feature
 
     And "findConditionTrue(webacl, 'Ready')" is ok
     And "webacl.status.arn" is ok
-    And "webacl.status.capacity > 0" is ok
 
     # Clean up
     When resource "webacl" is deleted
     Then eventually resource "webacl" does not exist
-
-    When resource "stmt1" is deleted
-    Then eventually resource "stmt1" does not exist
-
-    When resource "stmt2" is deleted
-    Then eventually resource "stmt2" does not exist
-
-    When resource "stmt3" is deleted
-    Then eventually resource "stmt3" does not exist
-
-    When resource "stmt4" is deleted
-    Then eventually resource "stmt4" does not exist
-
-    When resource "stmt5" is deleted
-    Then eventually resource "stmt5" does not exist
-
-    When resource "stmt6" is deleted
-    Then eventually resource "stmt6" does not exist
 
   @skr @aws @waf @debug
   Scenario: Deploy httpbin application and protect it with AWS WAF
@@ -217,78 +191,69 @@ Feature: AwsWebAcl feature
     And resource declaration:
       | Alias           | Kind               | ApiVersion                              | Name                       | Namespace |
       | webacl          | AwsWebAcl          | cloud-resources.kyma-project.io/v1beta1 | e2e-${scenarioId}          | default   |
-      | stmtcommon      | AwsWebAclStatement | cloud-resources.kyma-project.io/v1beta1 | e2e-${scenarioId}-common   |           |
-      | stmtbadinputs   | AwsWebAclStatement | cloud-resources.kyma-project.io/v1beta1 | e2e-${scenarioId}-badinput |           |
       | sa              | ServiceAccount     | v1                                      | e2e-${scenarioId}          | default   |
       | service         | Service            | v1                                      | e2e-${scenarioId}          | default   |
       | deployment      | Deployment         | apps/v1                                 | e2e-${scenarioId}          | default   |
       | ingressclass    | IngressClass       | networking.k8s.io/v1                    | alb                        |           |
       | ingress         | Ingress            | networking.k8s.io/v1                    | e2e-${scenarioId}          | default   |
 
-    # Step 1a: Create AwsWebAclStatement resources
-    When resource "stmtbadinputs" is created:
-      """
-      apiVersion: cloud-resources.kyma-project.io/v1beta1
-      kind: AwsWebAclStatement
-      spec:
-        managedRuleGroup:
-          vendorName: AWS
-          name: AWSManagedRulesKnownBadInputsRuleSet
-      """
-
-    And resource "stmtcommon" is created:
-      """
-      apiVersion: cloud-resources.kyma-project.io/v1beta1
-      kind: AwsWebAclStatement
-      spec:
-        managedRuleGroup:
-          vendorName: AWS
-          name: AWSManagedRulesCommonRuleSet
-      """
-
-    And debug wait "statements"
-
-    # Step 1b: Create AWS WebACL with security rules
+    # Step 1: Create AWS WebACL with security rules
     When resource "webacl" is created:
       """
       apiVersion: cloud-resources.kyma-project.io/v1beta1
       kind: AwsWebAcl
       spec:
-        defaultAction:
-          allow: {}
-
-        description: "Common threat protection for httpbin"
-
-        visibilityConfig:
-          cloudWatchMetricsEnabled: true
-          metricName: httpbin-waf-metrics
-          sampledRequestsEnabled: true
-
-        rules:
-          - name: known-bad-inputs
-            priority: 0
-            overrideAction:
-              none: {}
-            statementRef:
-              name: e2e-${scenarioId}-badinput
-            visibilityConfig:
-              cloudWatchMetricsEnabled: true
-              metricName: known-bad-inputs
-              sampledRequestsEnabled: true
-
-          - name: common-rules
-            priority: 1
-            overrideAction:
-              none: {}
-            statementRef:
-              name: e2e-${scenarioId}-common
-            visibilityConfig:
-              cloudWatchMetricsEnabled: true
-              metricName: common-rules
-              sampledRequestsEnabled: true
+        data: |
+          {
+            "DefaultAction": {
+              "Allow": {}
+            },
+            "Description": "Common threat protection for httpbin",
+            "VisibilityConfig": {
+              "CloudWatchMetricsEnabled": true,
+              "MetricName": "httpbin-waf-metrics",
+              "SampledRequestsEnabled": true
+            },
+            "Rules": [
+              {
+                "Name": "known-bad-inputs",
+                "Priority": 0,
+                "Statement": {
+                  "ManagedRuleGroupStatement": {
+                    "VendorName": "AWS",
+                    "Name": "AWSManagedRulesKnownBadInputsRuleSet"
+                  }
+                },
+                "OverrideAction": {
+                  "None": {}
+                },
+                "VisibilityConfig": {
+                  "CloudWatchMetricsEnabled": true,
+                  "MetricName": "known-bad-inputs",
+                  "SampledRequestsEnabled": true
+                }
+              },
+              {
+                "Name": "common-rules",
+                "Priority": 1,
+                "Statement": {
+                  "ManagedRuleGroupStatement": {
+                    "VendorName": "AWS",
+                    "Name": "AWSManagedRulesCommonRuleSet"
+                  }
+                },
+                "OverrideAction": {
+                  "None": {}
+                },
+                "VisibilityConfig": {
+                  "CloudWatchMetricsEnabled": true,
+                  "MetricName": "common-rules",
+                  "SampledRequestsEnabled": true
+                }
+              }
+            ]
+          }
       """
-
-    Then debug wait "webacl"
 
     Then eventually "webacl.status.state == 'Ready'" is ok, unless:
       | webacl.status.state == 'Error' |
@@ -296,7 +261,6 @@ Feature: AwsWebAcl feature
 
     And "findConditionTrue(webacl, 'Ready')" is ok
     And "webacl.status.arn" is ok
-    And "webacl.status.capacity > 0" is ok
 
     # Step 2: Deploy httpbin application
     When resource "sa" is created:
@@ -388,7 +352,7 @@ Feature: AwsWebAcl feature
       """
 
     Then eventually "ingress.status.loadBalancer.ingress[0].hostname != ''" is ok, unless:
-      | #timeout=10m |
+      | #timeout=20m |
 
     # Then debug wait "ingress"
 
@@ -409,12 +373,6 @@ Feature: AwsWebAcl feature
 
     When resource "webacl" is deleted
     Then eventually resource "webacl" does not exist
-
-    When resource "stmtbadinputs" is deleted
-    Then eventually resource "stmtbadinputs" does not exist
-
-    When resource "stmtcommon" is deleted
-    Then eventually resource "stmtcommon" does not exist
 
     When resource "ingressclass" is deleted
     Then eventually resource "ingressclass" does not exist

@@ -6,9 +6,10 @@ data:
           widget: Panel
           source: spec
           children:
-            - widget: Labels
-              source: description
-              name: spec.description
+            - widget: CodeViewer
+              source: data
+              name: spec.data
+              language: json
         - name: status
           widget: Panel
           source: status
@@ -17,13 +18,17 @@ data:
               source: state
               name: status.state
             - widget: Labels
+              source: arn
+              name: status.arn
+            - widget: Labels
               source: capacity
               name: status.capacity
   form: |
-    - path: spec.description
-      name: spec.description
-      widget: Text
-      required: false
+    - path: spec.data
+      name: spec.data
+      widget: CodeEditor
+      language: "'plaintext'"
+      required: true
   general: |
     resource:
         kind: AwsWebAcl
@@ -33,20 +38,22 @@ data:
     name: AWS WebACLs
     scope: cluster
     category: Security
-    icon: locked
     description: >-
         AWS Web Application Firewall (WAF) WebACL for protecting web applications
   list: |
     - source: status.state
       name: status.state
       sort: true
+    - source: status.arn
+      name: status.arn
     - source: status.capacity
       name: status.capacity
       sort: true
   translations: |
     en:
-      spec.description: Description
+      spec.data: WebACL Configuration (JSON)
       status.state: State
+      status.arn: ARN
       status.capacity: Capacity
       configuration: Configuration
       status: Status

@@ -80,5 +80,6 @@ const (
 const (
 	ReasonProviderError   = "ProviderError"
 	ReasonReady           = "Ready"
+	ReasonProcessing      = "Processing"
 	ReasonDeleteWhileUsed = "DeleteWhileUsed"
 )

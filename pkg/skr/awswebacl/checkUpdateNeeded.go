@@ -2,212 +2,94 @@ package awswebacl
 
 import (
 	"context"
+	"encoding/json"
 	"reflect"
 
-	wafv2types "github.com/aws/aws-sdk-go-v2/service/wafv2/types"
+	"github.com/aws/aws-sdk-go-v2/service/wafv2"
 	"github.com/kyma-project/cloud-manager/pkg/composed"
-	"k8s.io/utils/ptr"
 )
 
 func checkUpdateNeeded(ctx context.Context, st composed.State) (error, context.Context) {
 	state := st.(*State)
+	logger := composed.LoggerFromCtx(ctx)
 	webAcl := state.ObjAsAwsWebAcl()
 
-	// Skip if not created yet
-	if webAcl.Status.Arn == "" {
-		state.updateNeeded = false
-		return nil, ctx
-	}
-
-	// Skip if AWS WebACL not loaded
+	// Skip if not loaded yet
 	if state.awsWebAcl == nil {
-		state.updateNeeded = false
 		return nil, ctx
 	}
 
-	// Convert spec to AWS types for comparison
-	defaultAction, err := convertDefaultAction(webAcl.Spec.DefaultAction)
-	if err != nil {
-		state.updateNeeded = false
-		return nil, ctx
+	// Parse desired spec from JSON
+	var desired wafv2.CreateWebACLInput
+	if err := json.Unmarshal([]byte(webAcl.Spec.Data), &desired); err != nil {
+		return composed.LogErrorAndReturn(err, "Error parsing WebACL JSON from spec.data", composed.StopWithRequeue, ctx)
 	}
 
-	rules, err := convertRules(ctx, state.Cluster().K8sClient(), webAcl.Spec.Rules)
-	if err != nil {
-		state.updateNeeded = false
-		return nil, ctx
-	}
+	// Compare desired vs current state
+	current := state.awsWebAcl
 
-	visibilityConfig := convertVisibilityConfig(webAcl.Spec.VisibilityConfig, webAcl.Name)
-
-	// Compare defaultAction
-	if !compareDefaultAction(state.awsWebAcl.DefaultAction, defaultAction) {
+	// Check DefaultAction
+	if !reflect.DeepEqual(desired.DefaultAction, current.DefaultAction) {
+		logger.Info("Update needed: DefaultAction changed")
 		state.updateNeeded = true
 		return nil, ctx
 	}
 
-	// Compare visibilityConfig
-	if !compareVisibilityConfig(state.awsWebAcl.VisibilityConfig, visibilityConfig) {
+	// Check Rules (compare count and deep equality)
+	if len(desired.Rules) != len(current.Rules) {
+		logger.Info("Update needed: Rules count changed")
+		state.updateNeeded = true
+		return nil, ctx
+	}
+	if !reflect.DeepEqual(desired.Rules, current.Rules) {
+		logger.Info("Update needed: Rules changed")
 		state.updateNeeded = true
 		return nil, ctx
 	}
 
-	// Compare rules
-	if !compareRules(state.awsWebAcl.Rules, rules) {
+	// Check VisibilityConfig
+	if !reflect.DeepEqual(desired.VisibilityConfig, current.VisibilityConfig) {
+		logger.Info("Update needed: VisibilityConfig changed")
 		state.updateNeeded = true
 		return nil, ctx
 	}
 
-	// No update needed - stop and forget to skip updateWebAcl
+	// Check CustomResponseBodies
+	if !reflect.DeepEqual(desired.CustomResponseBodies, current.CustomResponseBodies) {
+		logger.Info("Update needed: CustomResponseBodies changed")
+		state.updateNeeded = true
+		return nil, ctx
+	}
+
+	// Check TokenDomains
+	if !reflect.DeepEqual(desired.TokenDomains, current.TokenDomains) {
+		logger.Info("Update needed: TokenDomains changed")
+		state.updateNeeded = true
+		return nil, ctx
+	}
+
+	// Check CaptchaConfig
+	if !reflect.DeepEqual(desired.CaptchaConfig, current.CaptchaConfig) {
+		logger.Info("Update needed: CaptchaConfig changed")
+		state.updateNeeded = true
+		return nil, ctx
+	}
+
+	// Check ChallengeConfig
+	if !reflect.DeepEqual(desired.ChallengeConfig, current.ChallengeConfig) {
+		logger.Info("Update needed: ChallengeConfig changed")
+		state.updateNeeded = true
+		return nil, ctx
+	}
+
+	// Check Description
+	if !reflect.DeepEqual(desired.Description, current.Description) {
+		logger.Info("Update needed: Description changed")
+		state.updateNeeded = true
+		return nil, ctx
+	}
+
+	logger.Info("No update needed, WebACL matches desired state")
 	state.updateNeeded = false
 	return nil, ctx
-}
-
-func compareDefaultAction(aws, spec *wafv2types.DefaultAction) bool {
-	if aws == nil && spec == nil {
-		return true
-	}
-	if aws == nil || spec == nil {
-		return false
-	}
-
-	// Check Allow
-	if (aws.Allow != nil) != (spec.Allow != nil) {
-		return false
-	}
-
-	// Check Block
-	if (aws.Block != nil) != (spec.Block != nil) {
-		return false
-	}
-
-	return true
-}
-
-func compareVisibilityConfig(aws, spec *wafv2types.VisibilityConfig) bool {
-	if aws == nil && spec == nil {
-		return true
-	}
-	if aws == nil || spec == nil {
-		return false
-	}
-
-	if aws.CloudWatchMetricsEnabled != spec.CloudWatchMetricsEnabled {
-		return false
-	}
-
-	if aws.SampledRequestsEnabled != spec.SampledRequestsEnabled {
-		return false
-	}
-
-	// MetricName comparison
-	if !ptr.Equal(aws.MetricName, spec.MetricName) {
-		return false
-	}
-
-	return true
-}
-
-func compareRules(awsRules, specRules []wafv2types.Rule) bool {
-	if len(awsRules) != len(specRules) {
-		return false
-	}
-
-	// Compare each rule
-	for i := range awsRules {
-		if !compareRule(&awsRules[i], &specRules[i]) {
-			return false
-		}
-	}
-
-	return true
-}
-
-func compareRule(aws, spec *wafv2types.Rule) bool {
-	if aws == nil && spec == nil {
-		return true
-	}
-	if aws == nil || spec == nil {
-		return false
-	}
-
-	// Compare Name
-	if !ptr.Equal(aws.Name, spec.Name) {
-		return false
-	}
-
-	// Compare Priority
-	if aws.Priority != spec.Priority {
-		return false
-	}
-
-	// Compare Action (but only if not a managed rule group)
-	if spec.OverrideAction == nil {
-		if !compareRuleAction(aws.Action, spec.Action) {
-			return false
-		}
-	}
-
-	// Compare OverrideAction (for managed rule groups)
-	if spec.OverrideAction != nil {
-		if !compareOverrideAction(aws.OverrideAction, spec.OverrideAction) {
-			return false
-		}
-	}
-
-	// Compare Statement - use deep equal for simplicity
-	if !reflect.DeepEqual(aws.Statement, spec.Statement) {
-		return false
-	}
-
-	// Compare VisibilityConfig
-	if !compareVisibilityConfig(aws.VisibilityConfig, spec.VisibilityConfig) {
-		return false
-	}
-
-	return true
-}
-
-func compareRuleAction(aws, spec *wafv2types.RuleAction) bool {
-	if aws == nil && spec == nil {
-		return true
-	}
-	if aws == nil || spec == nil {
-		return false
-	}
-
-	// Check which action type is set
-	if (aws.Allow != nil) != (spec.Allow != nil) {
-		return false
-	}
-	if (aws.Block != nil) != (spec.Block != nil) {
-		return false
-	}
-	if (aws.Count != nil) != (spec.Count != nil) {
-		return false
-	}
-	if (aws.Captcha != nil) != (spec.Captcha != nil) {
-		return false
-	}
-
-	return true
-}
-
-func compareOverrideAction(aws, spec *wafv2types.OverrideAction) bool {
-	if aws == nil && spec == nil {
-		return true
-	}
-	if aws == nil || spec == nil {
-		return false
-	}
-
-	// Check None action
-	if (aws.None != nil) != (spec.None != nil) {
-		return false
-	}
-	if (aws.Count != nil) != (spec.Count != nil) {
-		return false
-	}
-
-	return true
 }

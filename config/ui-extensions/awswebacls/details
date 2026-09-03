@@ -3,9 +3,10 @@ body:
       widget: Panel
       source: spec
       children:
-        - widget: Labels
-          source: description
-          name: spec.description
+        - widget: CodeViewer
+          source: data
+          name: spec.data
+          language: json
     - name: status
       widget: Panel
       source: status
@@ -13,6 +14,9 @@ body:
         - widget: Labels
           source: state
           name: status.state
+        - widget: Labels
+          source: arn
+          name: status.arn
         - widget: Labels
           source: capacity
           name: status.capacity

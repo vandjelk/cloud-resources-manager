@@ -209,14 +209,6 @@ rules:
   - patch
   - update
 - apiGroups:
-  - cloud-resources.kyma-project.io
-  resources:
-  - awswebaclstatements
-  verbs:
-  - get
-  - list
-  - watch
-- apiGroups:
   - infrastructuremanager.kyma-project.io
   resources:
   - gardenerclusters

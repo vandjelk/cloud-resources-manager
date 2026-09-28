@@ -55,119 +55,9 @@ protection: Maximum
 actions: CAPTCHA challenge on bot detection
 ```
 
-## Portable API Design
+## API Design
 
-```yaml
-apiVersion: cloud-resources.kyma-project.io/v1alpha1
-kind: WafConfiguration
-metadata:
-  name: bot-protection-policy
-spec:
-  # Start from preset that includes managed rules
-  basePolicyRef:
-    name: owasp-moderate
-  
-  # Custom bot detection rules
-  customRules:
-    # Allow search engines globally
-    - name: allow-search-engine-bots
-      priority: 10
-      action: allow
-      conditions:
-        header:
-          name: "User-Agent"
-          anyOf:
-            - contains: "Googlebot"
-            - contains: "Bingbot"
-            - contains: "Slackbot"
-      reason: "Allow verified search engine bots"
-    
-    # Block known bad bots
-    - name: block-scraper-bots
-      priority: 20
-      action: block
-      conditions:
-        header:
-          name: "User-Agent"
-          anyOf:
-            - contains: "scrapy"
-            - contains: "python-requests"
-            - contains: "curl"
-            - exact: "PostmanRuntime"
-      reason: "Block known scraper tools"
-    
-    # Block headless browsers (potential bots)
-    - name: block-headless-browsers
-      priority: 30
-      action: block
-      conditions:
-        header:
-          name: "User-Agent"
-          anyOf:
-            - contains: "HeadlessChrome"
-            - contains: "PhantomJS"
-            - contains: "Selenium"
-      reason: "Block headless browser automation"
-    
-    # Checkout: Block all bots (strict)
-    - name: checkout-no-bots
-      priority: 100
-      action: block
-      conditions:
-        path:
-          prefix: "/checkout"
-        botScore:
-          min: 1  # Any bot indication
-      reason: "Checkout requires human interaction"
-    
-    # Login: Maximum bot protection with challenge
-    - name: login-bot-challenge
-      priority: 110
-      action: challenge  # CAPTCHA or JS challenge
-      conditions:
-        path:
-          exact: "/login"
-        method: POST
-        botScore:
-          min: 50  # Medium bot likelihood
-      reason: "Challenge suspicious login attempts"
-    
-    # API: Allow bots with valid API key
-    - name: api-verified-bots-allowed
-      priority: 200
-      action: allow
-      conditions:
-        path:
-          prefix: "/api"
-        header:
-          name: "X-API-Key"
-          exists: true
-        botScore:
-          min: 1
-      reason: "API bots allowed with valid API key"
-    
-    # Product pages: Allow low bot scores (search engines)
-    - name: products-allow-low-bot-score
-      priority: 300
-      action: allow
-      conditions:
-        path:
-          prefix: "/products"
-        botScore:
-          max: 30  # Low bot likelihood (likely good bots)
-      reason: "Allow search engine indexing of products"
-    
-    # Block high bot scores on sensitive paths
-    - name: admin-block-bots
-      priority: 400
-      action: block
-      conditions:
-        path:
-          prefix: "/admin"
-        botScore:
-          min: 50  # High bot likelihood
-      reason: "Admin panel blocks automated access"
-```
+Bot protection rules go in a `WafPolicy` ConfigMap — the user provides a complete provider policy. For common use cases, the policy enables the provider's managed bot protection rule group. For advanced rules (custom User-Agent blocking, CAPTCHA), the policy includes those rules explicitly. See the provider capability check below for the exact JSON per provider.
 
 ## Provider Capability Check
 
@@ -526,158 +416,38 @@ spec:
 
 ---
 
-## Cross-Provider Comparison
+## Design Decision
+
+Bot protection is delivered via a `WafPolicy` ConfigMap — the user provides a complete provider policy. For common use cases, the policy enables the provider's managed bot protection rule group. For advanced rules (custom User-Agent blocking, CAPTCHA challenge configuration), the policy includes those rules explicitly.
+
+Typed bot-specific fields (`botScore`, `action: challenge`) are not part of any currently specified resource because:
+
+- `botScore` is AWS-specific — Azure has no bot score, GCP does not expose it in CEL
+- `action: challenge` has no equivalent on Azure
+- These fields would only work on a subset of providers
+
+### Portability validation result
 
 | Feature | AWS WAFv2 | Azure WAF | GCP Cloud Armor |
 |---------|-----------|-----------|-----------------|
 | **Managed bot protection** | ✅ Bot Control (excellent) | ⚠️ Bot Manager (basic) | ✅ Bot defense (good) |
-| **Bot score/likelihood** | ✅ 0-100 score | ❌ No | ⚠️ ML-based (not exposed) |
-| **Verified bot allowlist** | ✅ Yes | ❌ No | ⚠️ Manual via CEL |
-| **Bot categories** | ✅ 12+ categories | ❌ No | ❌ No |
-| **Challenge actions** | ✅ CAPTCHA, JS challenge | ❌ No | ✅ reCAPTCHA Enterprise |
 | **Custom User-Agent rules** | ✅ Yes | ✅ Yes | ✅ Yes (CEL) |
+| **Challenge / CAPTCHA actions** | ✅ CAPTCHA, JS challenge | ❌ No | ✅ reCAPTCHA Enterprise |
+| **Bot score** | ✅ 0-100 (AWS-specific) | ❌ No | ❌ Not exposed in CEL |
 | **Per-path bot policies** | ✅ ScopeDownStatement | ⚠️ Custom rules only | ✅ CEL conditions |
-| **Bot verification** | ✅ Native | ❌ Manual | ❌ Manual |
-| **Adaptive/ML protection** | ⚠️ Via Fraud Control | ❌ No | ✅ Adaptive Protection |
-| **Cost** | Paid add-on (~$10/mo) | Included | reCAPTCHA paid |
-| **Complexity** | Low | Medium | Medium |
-| **Fidelity** | Excellent | Basic | Good |
 
----
+## Validation Matrix
 
-## Design Decision Impact
-
-### Recommendation: ✅ **Include with Provider Differences**
-
-**Rationale:**
-1. **AWS has best bot protection** - Bot Control with categories, verification, CAPTCHA
-2. **Azure has basic bot protection** - Bot Manager rule set, manual User-Agent rules
-3. **GCP has good bot protection** - Preconfigured bot defense + reCAPTCHA Enterprise
-4. **Critical security need** - Bot attacks (credential stuffing, scraping, DDoS) are common
-
-**API Design:**
-
-```yaml
-spec:
-  # Start from preset that includes managed rules
-  basePolicyRef:
-    name: owasp-moderate
-      botProtection:
-        level: standard  # minimal | standard | strict
-        allowVerifiedBots: true
-        verifiedBots: [GoogleBot, BingBot]
-        blockCategories: [scraper, attack_tool]
-  
-  customRules:
-    - name: allow-good-bots
-      priority: 10
-      action: allow
-      conditions:
-        header:
-          name: "User-Agent"
-          contains: "Googlebot"
-    
-    - name: login-bot-challenge
-      priority: 100
-      action: challenge  # CAPTCHA
-      conditions:
-        path: {exact: "/login"}
-        method: POST
-```
-
-### Status Reporting
-
-**AWS (Excellent):**
-```yaml
-status:
-  appliedManagedRuleGroups:
-    - name: AWSManagedRulesBotControlRuleSet
-      appliedStrategy: "native"
-      message: "Using AWS Bot Control Rule Set (TARGETED level) with verified bot allowlist"
-```
-
-**Azure (Basic):**
-```yaml
-status:
-  conditions:
-    - type: "BotProtectionLimited"
-      status: "True"
-      reason: "AzureBasicBotManager"
-      message: "Azure Bot Manager provides basic bot detection. For advanced bot protection (bot score, verified bots, CAPTCHA), consider Azure Front Door Premium or application-level bot management."
-  
-  appliedManagedRuleGroups:
-    - name: Microsoft_BotManagerRuleSet
-      appliedStrategy: "basic"
-      message: "Using Microsoft Bot Manager Rule Set (basic detection only)"
-```
-
-**GCP (Good):**
-```yaml
-status:
-  appliedManagedRuleGroups:
-    - name: cve-canary
-      appliedStrategy: "native"
-      message: "Using preconfigured bot-defense WAF rule + reCAPTCHA Enterprise challenges"
-```
-
----
-
-## Implementation Priority
-
-### Phase 1: Custom User-Agent Rules (Universal)
-```yaml
-customRules:
-  - name: allow-search-bots
-    action: allow
-    conditions:
-      header: {name: "User-Agent", contains: "Googlebot"}
-  
-  - name: block-scraper-bots
-    action: block
-    conditions:
-      header: {name: "User-Agent", contains: "scrapy"}
-```
-**Works on:** AWS ✅, Azure ✅, GCP ✅
-
-### Phase 2: Managed Bot Protection
-```yaml
-  # Start from preset that includes managed rules
-  basePolicyRef:
-    name: owasp-moderate
-```
-**Works on:** AWS ✅ (excellent), Azure ⚠️ (basic), GCP ✅ (good)
-
-### Phase 3: Challenge Actions
-```yaml
-customRules:
-  - name: login-challenge
-    action: challenge
-    conditions:
-      path: {exact: "/login"}
-```
-**Works on:** AWS ✅ (CAPTCHA), Azure ❌ (not supported), GCP ✅ (reCAPTCHA)
-
----
+| Test Case | AWS | Azure | GCP | Expected Behavior |
+|-----------|-----|-------|-----|-------------------|
+| User-Agent: Googlebot | ✅ Allowed | ✅ Allowed | ✅ Allowed | Good bot allowed |
+| User-Agent: scrapy | ✅ Blocked | ✅ Blocked | ✅ Blocked | Bad bot blocked |
+| POST /login by bot | ✅ CAPTCHA challenge | ❌ Not supported | ✅ reCAPTCHA challenge | Bot challenged on login |
+| Bot traffic to /admin | ✅ Blocked (Bot Control) | ⚠️ Basic detection only | ✅ Blocked (bot-defense) | Admin protected |
 
 ## Conclusion
 
-**Bot protection has varying levels of support:**
-- ✅ **AWS**: Excellent - Bot Control with categories, verification, CAPTCHA (paid add-on)
-- ⚠️ **Azure**: Basic - Bot Manager rule set, no advanced features
-- ✅ **GCP**: Good - Preconfigured bot defense + reCAPTCHA Enterprise
+**Bot protection is delivered via a `WafPolicy` ConfigMap with provider-specific JSON.**
 
-**Recommendation:** ✅ **High Priority - Implement with Provider Tiers**
+The provider capability sections above serve as the reference for what to put in the ConfigMap.
 
-**Implementation Strategy:**
-1. **Phase 1:** Custom User-Agent rules (universal support)
-2. **Phase 2:** Managed bot protection rule group (different capabilities per provider)
-3. **Phase 3:** Challenge actions for sensitive paths (AWS/GCP only)
-
-**Real-World Use Cases:**
-- Credential stuffing prevention on login
-- E-commerce scraper blocking
-- Search engine bot allowlisting (SEO)
-- DDoS bot mitigation
-- API bot rate limiting
-
-Bot protection is critical for modern web applications and should be included despite varying provider capabilities!

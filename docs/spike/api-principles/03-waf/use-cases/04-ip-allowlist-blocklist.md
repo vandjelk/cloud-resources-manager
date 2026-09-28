@@ -55,166 +55,9 @@ allowlist:
 5. Allow everyone else on public paths
 ```
 
-## Portable API Design
+## API Design
 
-```yaml
-apiVersion: cloud-resources.kyma-project.io/v1alpha1
-kind: WafConfiguration
-metadata:
-  name: ip-access-control-policy
-spec:
-  # Start from preset that includes managed rules
-  basePolicyRef:
-    name: owasp-moderate
-  
-  # Custom rules for IP-based access control
-  customRules:
-    # Priority 1-99: Global allowlist (highest priority)
-    - name: allow-internal-network
-      priority: 10
-      action: allow
-      conditions:
-        sourceIP:
-          cidr: "10.0.0.0/8"
-      reason: "Internal network always allowed"
-    
-    - name: allow-office-vpn
-      priority: 20
-      action: allow
-      conditions:
-        sourceIP:
-          cidr: "172.16.0.0/12"
-      reason: "Office VPN always allowed"
-    
-    # Priority 100-199: Global blocklist
-    - name: block-known-botnet
-      priority: 100
-      action: block
-      conditions:
-        sourceIP:
-          cidr: "203.0.113.0/24"
-      reason: "Known botnet range"
-    
-    - name: block-tor-exit-nodes
-      priority: 110
-      action: block
-      conditions:
-        sourceIP:
-          cidr: "192.0.2.0/24"
-      reason: "Tor exit nodes"
-    
-    - name: block-specific-attacker
-      priority: 120
-      action: block
-      conditions:
-        sourceIP:
-          ip: "198.51.100.42"
-      reason: "Specific attacker IP from incident response"
-    
-    # Priority 200-299: Path-specific allowlist
-    - name: admin-only-from-trusted-ips
-      priority: 200
-      action: allow
-      conditions:
-        path:
-          prefix: "/admin"
-        sourceIP:
-          anyOf:
-            - cidr: "10.0.0.0/8"
-            - cidr: "172.16.0.0/12"
-            - ip: "203.0.113.50"
-      reason: "Admin panel only accessible from trusted IPs"
-    
-    - name: partner-a-api-access
-      priority: 210
-      action: allow
-      conditions:
-        path:
-          prefix: "/api/partner-a"
-        sourceIP:
-          cidr: "198.51.100.0/24"
-      reason: "Partner A API access from their network"
-    
-    - name: partner-b-api-access
-      priority: 220
-      action: allow
-      conditions:
-        path:
-          prefix: "/api/partner-b"
-        sourceIP:
-          cidr: "203.0.113.0/24"
-      reason: "Partner B API access from their network"
-    
-    # Priority 300-399: Path-specific blocklist (deny all others on sensitive paths)
-    - name: block-admin-from-public
-      priority: 300
-      action: block
-      conditions:
-        path:
-          prefix: "/admin"
-      reason: "Block all other IPs from accessing admin panel"
-    
-    - name: block-partner-api-from-public
-      priority: 310
-      action: block
-      conditions:
-        path:
-          prefix: "/api/partner-"
-      reason: "Block public access to partner APIs"
-```
-
-## Alternative API Design: Dedicated IP Lists
-
-```yaml
-apiVersion: cloud-resources.kyma-project.io/v1alpha1
-kind: WafConfiguration
-metadata:
-  name: ip-access-control-policy-v2
-spec:
-  # Reusable IP sets (optional syntactic sugar)
-  ipSets:
-    - name: internal-network
-      cidrs:
-        - "10.0.0.0/8"
-        - "172.16.0.0/12"
-      description: "Corporate internal network"
-    
-    - name: known-threats
-      cidrs:
-        - "203.0.113.0/24"
-        - "192.0.2.0/24"
-      ips:
-        - "198.51.100.42"
-      description: "Known malicious IPs from threat intel"
-    
-    - name: partner-a-network
-      cidrs:
-        - "198.51.100.0/24"
-      description: "Partner A network range"
-  
-  customRules:
-    - name: allow-internal
-      priority: 10
-      action: allow
-      conditions:
-        sourceIP:
-          ipSetRef: internal-network
-    
-    - name: block-threats
-      priority: 100
-      action: block
-      conditions:
-        sourceIP:
-          ipSetRef: known-threats
-    
-    - name: admin-access-control
-      priority: 200
-      action: allow
-      conditions:
-        path: {prefix: "/admin"}
-        sourceIP:
-          ipSetRef: internal-network
-```
+IP allowlist/blocklist rules go in a `WafPolicy` ConfigMap — the user provides a complete provider policy. See [implementation-examples.md](../implementation-examples.md) Use Case 3 for ConfigMap content per provider.
 
 ## Provider Capability Check
 
@@ -569,154 +412,37 @@ spec:
 
 ---
 
-## Cross-Provider Comparison
+## Design Decision
+
+IP allowlist/blocklist rules are not exposed as typed fields. They belong in a `WafPolicy` ConfigMap because:
+
+- AWS requires pre-created IPSet resources (ARNs) — not inline CIDRs at policy level; this cannot be abstracted transparently
+- Provider JSON structures differ enough that a typed field would require provider knowledge anyway
+
+### Portability validation result
 
 | Feature | AWS WAFv2 | Azure WAF | GCP Cloud Armor |
 |---------|-----------|-----------|-----------------|
 | **IP allowlist/blocklist** | ✅ Perfect | ✅ Perfect | ✅ Perfect |
 | **CIDR support** | ✅ Yes | ✅ Yes | ✅ Yes |
 | **Individual IP support** | ✅ Yes | ✅ Yes | ✅ Yes |
-| **IPv4 support** | ✅ Yes | ✅ Yes | ✅ Yes |
-| **IPv6 support** | ✅ Yes | ✅ Yes | ✅ Yes |
+| **IPv4 and IPv6** | ✅ Yes | ✅ Yes | ✅ Yes |
 | **Reusable IP sets** | ✅ IPSet resource | ❌ Inline only | ❌ Inline only |
-| **Max IPs per rule** | 10,000 (IPSet) | ~100 (inline) | ~100 (CEL length) |
 | **Path + IP combination** | ✅ AndStatement | ✅ Multiple matchConditions | ✅ CEL && |
-| **Update without policy change** | ✅ Update IPSet | ❌ Update policy | ❌ Update policy |
-| **Complexity** | Low | Low | Low |
-| **Fidelity** | Perfect | Perfect | Perfect |
-
----
-
-## Design Decision Impact
-
-### API Design - Approach A: Inline IPs (Simpler)
-
-```yaml
-spec:
-  customRules:
-    - name: allow-internal
-      priority: 10
-      action: allow
-      conditions:
-        sourceIP:
-          anyOf:
-            - cidr: "10.0.0.0/8"
-            - cidr: "172.16.0.0/12"
-            - ip: "203.0.113.50"
-```
-
-**Pros:**
-- Simple, works everywhere
-- No new concepts
-
-**Cons:**
-- IP duplication across rules
-- Updating IPs requires policy update
-
-### API Design - Approach B: Reusable IP Sets (Better for large lists)
-
-```yaml
-spec:
-  ipSets:
-    - name: internal-network
-      cidrs: ["10.0.0.0/8", "172.16.0.0/12"]
-      ips: ["203.0.113.50"]
-  
-  customRules:
-    - name: allow-internal
-      priority: 10
-      action: allow
-      conditions:
-        sourceIP:
-          ipSetRef: internal-network
-```
-
-**Pros:**
-- DRY principle (define once, reference many times)
-- AWS can map to native IPSet resources
-- Easier to update large lists
-
-**Cons:**
-- Azure/GCP must expand inline (no native IP set concept)
-
-### Recommendation: ✅ **Support Both Approaches**
-
-```yaml
-spec:
-  # Optional: Reusable IP sets
-  ipSets:
-    - name: internal-network
-      cidrs: ["10.0.0.0/8"]
-      description: "Corporate network"
-  
-  customRules:
-    # Inline approach
-    - name: block-specific-threat
-      priority: 100
-      action: block
-      conditions:
-        sourceIP:
-          ip: "198.51.100.42"
-    
-    # IPSet reference approach
-    - name: allow-internal
-      priority: 10
-      action: allow
-      conditions:
-        sourceIP:
-          ipSetRef: internal-network
-```
-
-**Rationale:**
-- Inline IPs: Simple, works great for small lists (1-10 IPs)
-- IPSet references: Better for large lists (100+ IPs), threat intel feeds
-- AWS can optimize with native IPSet resources
-- Azure/GCP expand IPSet refs to inline IPs
-
----
-
-## Implementation Strategy
-
-### AWS KCP Reconciler
-
-
-### Azure KCP Reconciler
-
-
-### GCP KCP Reconciler
-
-
----
 
 ## Validation Matrix
 
 | Test Case | AWS | Azure | GCP | Expected Behavior |
 |-----------|-----|-------|-----|-------------------|
-| Request from 10.0.0.5 | ✅ Allowed (internal) | ✅ Allowed | ✅ Allowed | Internal network allowed globally |
-| Request from 203.0.113.50 to /admin | ✅ Allowed | ✅ Allowed | ✅ Allowed | Trusted admin IP |
+| Request from 10.0.0.5 | ✅ Allowed | ✅ Allowed | ✅ Allowed | Internal network allowed globally |
 | Request from 198.51.100.42 | ✅ Blocked | ✅ Blocked | ✅ Blocked | Known threat blocked |
-| Request from 203.0.113.50 to /api | ✅ Allowed | ✅ Allowed | ✅ Allowed | Public path allowed |
+| Request from 203.0.113.50 to /admin | ✅ Allowed | ✅ Allowed | ✅ Allowed | Trusted admin IP |
 | Request from public IP to /admin | ✅ Blocked | ✅ Blocked | ✅ Blocked | Admin protected |
-| Request from 198.51.100.0/24 (Partner A) to /api/partner-a | ✅ Allowed | ✅ Allowed | ✅ Allowed | Partner access granted |
-
----
+| Request from 198.51.100.0/24 to /api/partner-a | ✅ Allowed | ✅ Allowed | ✅ Allowed | Partner access granted |
 
 ## Conclusion
 
-**IP allowlist and blocklist work perfectly across all three providers.** This is one of the most universally supported WAF features.
+**IP allowlist/blocklist works perfectly across all three providers and is delivered via a `WafPolicy` ConfigMap.**
 
-**Recommendation:** ✅ **High Priority - Implement Early**
+See `implementation-examples.md` Use Case 3 for complete provider-specific ConfigMap content for this use case.
 
-**Key Features to Support:**
-1. ✅ Inline IP/CIDR matching (all providers)
-2. ✅ Reusable IP sets (AWS native, expand for Azure/GCP)
-3. ✅ Combine IP + path conditions (all providers)
-4. ✅ IPv4 and IPv6 support (all providers)
-5. ✅ Priority-based evaluation (allowlist before blocklist)
-
-**Implementation Priority:**
-- **Phase 1:** Inline IP matching in customRules
-- **Phase 2:** Reusable ipSets with references
-- **Phase 3:** Integration with external threat intelligence feeds
-
-This is a foundational security feature that should be prioritized alongside managed rule groups and custom rules!

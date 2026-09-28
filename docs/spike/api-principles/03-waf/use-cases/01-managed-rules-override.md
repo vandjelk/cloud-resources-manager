@@ -11,34 +11,14 @@
 3. Override specific rule IDs to different action (e.g., count)
 4. Override applies to ALL requests (no conditions)
 
-## Portable API Design
+## API Design
 
-```yaml
-apiVersion: cloud-resources.kyma-project.io/v1alpha1
-kind: WafConfiguration
-metadata:
-  name: production-policy
-spec:
-  # Start from base policy that includes managed rules
-  basePolicyRef:
-    name: owasp-moderate
-  
-  # Unconditional rule overrides
-  ruleOverrides:
-    - managedRuleGroup: AWSManagedRulesCommonRuleSet  # AWS-specific name
-      ruleId: "SizeRestrictions_BODY"  # AWS rule name
-      action: count
-      reason: "False positives on legitimate file uploads"
-    - managedRuleGroup: AWSManagedRulesCommonRuleSet
-      ruleId: "GenericRFI_BODY"  # AWS rule name
-      action: count
-      reason: "Testing for false positives on API endpoints"
-```
+**Why managed rule overrides are not portable:**
+- `managedRuleGroup` and `ruleId` fields use provider-specific names — AWS rule IDs do not exist on Azure or GCP
+- GCP has no per-rule override mechanism; any override degrades the **entire matched ruleset** to preview mode
+- A field that silently behaves differently per provider is worse than no abstraction
 
-**Note:** `managedRuleGroup` field uses **provider-specific** names:
-- AWS: `AWSManagedRulesCommonRuleSet`, `AWSManagedRulesSQLiRuleSet`
-- Azure: `Microsoft_DefaultRuleSet`, `Microsoft_BotManagerRuleSet`
-- GCP: `owasp-crs-v030301-id`, `sqli-v33-stable`
+Users who need to override managed rules create a `WafPolicy` referencing a ConfigMap with the complete provider policy including the override configuration (see the provider capability translations below).
 
 ## Provider Capability Check
 
@@ -229,91 +209,36 @@ spec:
 
 ---
 
-## Cross-Provider Comparison
+## Design Decision
+
+### Why `ruleOverrides` is not a typed field
+
+- `managedRuleGroup` and `ruleId` are provider-specific identifiers — not portable
+- GCP cannot override individual rules; any override degrades the entire matched ruleset to preview mode
+- A field that silently behaves differently per provider is a leaky abstraction — worse than no abstraction
+
+Provider-specific rule tuning belongs in a `WafPolicy` ConfigMap, not in a portable resource field.
+
+### Validation result
 
 | Feature | AWS WAFv2 | Azure WAF | GCP Cloud Armor |
 |---------|-----------|-----------|-----------------|
 | **Individual rule override** | ✅ Yes | ✅ Yes | ❌ No |
 | **Granularity** | Rule ID level | Rule ID level | Rule set level only |
 | **Override actions** | Count, Allow, Block | Log, Allow, Block, Disabled | Preview (entire rule set) |
-| **Complexity** | Low | Low | Medium |
 | **Fidelity** | Perfect | Perfect | Degraded |
 
-## Design Decision Impact
-
-### API Design
-
-✅ **Include `ruleOverrides` field** in portable API:
-
-```yaml
-spec:
-  ruleOverrides:
-    - managedRuleGroup: AWSManagedRulesCommonRuleSet  # Provider-specific name
-      ruleId: "SizeRestrictions_BODY"  # AWS-specific rule name
-      action: count
-      reason: "False positives on file uploads"
-```
-
-**Note:** Both `managedRuleGroup` and `ruleId` use **provider-specific** names:
-- AWS rule names: `SizeRestrictions_BODY`, `GenericRFI_BODY`, `CrossSiteScripting_BODY`
-- Azure rule IDs: `942100`, `942200`, `920280` (OWASP CRS IDs)
-- GCP: Limited to rule-set level (no individual rule IDs)
-
-**Rationale:**
-- AWS and Azure support this perfectly (2 out of 3 providers)
-- GCP can degrade gracefully to rule-set level
-- Common use case: tuning managed rules for false positives
-
-### Status Reporting
-
-Report actual applied behavior in status:
-
-```yaml
-status:
-  appliedRuleOverrides:
-    - managedRuleGroup: AWSManagedRulesCommonRuleSet
-      ruleId: "SizeRestrictions_BODY"
-      action: count
-      appliedStrategy: "native"  # AWS, Azure
-      
-    # GCP would report:
-    - managedRuleGroup: owasp-crs-v030301-id
-      ruleId: "942100"  # User attempted Azure/OWASP rule ID
-      action: count
-      appliedStrategy: "degraded-ruleset-preview"
-      message: "GCP Cloud Armor does not support individual rule overrides; entire owasp-crs ruleset in preview mode"
-```
-
-### Implementation Notes
-
-**AWS KCP Reconciler**: Uses `RuleActionOverrides` within `ManagedRuleGroupStatement` to override individual rule actions.
-
-**Azure KCP Reconciler**: Uses `ruleGroupOverrides` with `ManagedRuleOverride` to change specific rule behavior.
-
-**GCP KCP Reconciler**: Falls back to rule-set level preview mode (no individual rule override support).
+GCP's inability to override individual rules (it degrades the entire ruleset to preview) is the deciding factor. A portable `ruleOverrides` field cannot behave consistently across all three providers.
 
 ## Validation Matrix
 
 | Test Case | AWS | Azure | GCP | Expected Behavior |
 |-----------|-----|-------|-----|-------------------|
-| Override single rule to count | ✅ Rule level | ✅ Rule level | ⚠️ Rule set preview | AWS: SizeRestrictions_BODY → count, Azure: 942100 → Log, GCP: entire set → preview |
-| Override multiple rules to count | ✅ Multiple rules | ✅ Multiple rules | ⚠️ Rule set preview | All specified rules → count (AWS/Azure), entire set → preview (GCP) |
-| Override rule to allow | ✅ Rule disabled | ✅ Rule disabled | ⚠️ Rule set preview | Rule bypassed (AWS/Azure), entire set → preview (GCP) |
-| No overrides | ✅ Default action | ✅ Default action | ✅ Default action | All rules follow managedRuleGroup action |
+| Override single rule to count | ✅ Rule level | ✅ Rule level | ⚠️ Rule set preview | AWS/Azure: specific rule → count; GCP: entire set → preview |
+| Override multiple rules to count | ✅ Multiple rules | ✅ Multiple rules | ⚠️ Rule set preview | AWS/Azure: each rule individually; GCP: entire set |
+| Override rule to allow | ✅ Rule disabled | ✅ Rule disabled | ⚠️ Rule set preview | AWS/Azure: rule bypassed; GCP: entire set → preview |
+| No overrides | ✅ Default action | ✅ Default action | ✅ Default action | All rules follow default managed rule group action |
 
 ## Conclusion
 
-**Recommendation:** ✅ **Implement `ruleOverrides` field**
-
-**Justification:**
-1. **High portability:** AWS and Azure have perfect support (2/3 providers)
-2. **Common use case:** Tuning managed rules for false positives is a real operational need
-3. **Graceful degradation:** GCP can fall back to rule-set level preview mode
-4. **Clear status reporting:** Users understand what was actually applied per provider
-
-**Next Steps:**
-1. Add `ruleOverrides` to WafPolicy CRD spec
-2. Implement AWS reconciler with RuleActionOverrides
-3. Implement Azure reconciler with ruleGroupOverrides
-4. Implement GCP reconciler with preview mode fallback
-5. Add status reporting for applied overrides and degradation warnings
+`ruleOverrides` is not part of any currently specified resource. Users who need to override managed rules supply a `WafPolicy` referencing a ConfigMap with provider-specific JSON that includes the override configuration. This makes the provider knowledge explicit rather than hiding it behind a field that silently degrades on GCP.

@@ -50,151 +50,9 @@ allow: US only
 reason: "Admin operations only from US headquarters"
 ```
 
-## Portable API Design
+## API Design
 
-```yaml
-apiVersion: cloud-resources.kyma-project.io/v1alpha1
-kind: WafConfiguration
-metadata:
-  name: geographic-policy
-spec:
-  # Start from preset that includes managed rules
-  basePolicyRef:
-    name: owasp-moderate
-  
-  customRules:
-    # Scenario A: EU-only service
-    - name: allow-eu-only
-      priority: 10
-      action: allow
-      conditions:
-        geographic:
-          countries:
-            - AT  # Austria
-            - BE  # Belgium
-            - DE  # Germany
-            - FR  # France
-            - IT  # Italy
-            - NL  # Netherlands
-            # ... all EU countries
-      reason: "GDPR compliance - EU only service"
-    
-    - name: block-non-eu
-      priority: 20
-      action: block
-      conditions: {}  # Match all
-      reason: "Block all non-EU traffic"
-    
-    # Scenario B: Block high-risk regions
-    - name: block-high-risk-countries
-      priority: 100
-      action: block
-      conditions:
-        geographic:
-          countries:
-            - CN  # China
-            - RU  # Russia
-            - KP  # North Korea
-      reason: "Block traffic from high-risk regions"
-    
-    # Scenario C: Market-specific APIs
-    - name: us-api-only-us-traffic
-      priority: 200
-      action: allow
-      conditions:
-        path:
-          prefix: "/api/us"
-        geographic:
-          countries:
-            - US
-      reason: "US API only accessible from US"
-    
-    - name: block-us-api-from-non-us
-      priority: 210
-      action: block
-      conditions:
-        path:
-          prefix: "/api/us"
-      reason: "Block non-US traffic to US API"
-    
-    - name: eu-api-only-eu-traffic
-      priority: 220
-      action: allow
-      conditions:
-        path:
-          prefix: "/api/eu"
-        geographic:
-          countries:
-            - AT
-            - BE
-            - DE
-            - FR
-            # ... EU countries
-      reason: "EU API only accessible from EU"
-    
-    # Scenario D: Admin geographic lock
-    - name: admin-only-from-us
-      priority: 300
-      action: allow
-      conditions:
-        path:
-          prefix: "/admin"
-        geographic:
-          countries:
-            - US
-      reason: "Admin panel only from US headquarters"
-    
-    - name: block-admin-from-non-us
-      priority: 310
-      action: block
-      conditions:
-        path:
-          prefix: "/admin"
-      reason: "Block non-US access to admin"
-```
-
-## Alternative API Design: Geographic Groups
-
-```yaml
-apiVersion: cloud-resources.kyma-project.io/v1alpha1
-kind: WafConfiguration
-metadata:
-  name: geographic-policy-v2
-spec:
-  # Reusable geographic groups
-  geographicGroups:
-    - name: eu-countries
-      countries:
-        - AT
-        - BE
-        - DE
-        - FR
-        - IT
-        # ... all EU countries
-      description: "European Union member states"
-    
-    - name: high-risk-countries
-      countries:
-        - CN
-        - RU
-        - KP
-      description: "Countries with high attack rates"
-  
-  customRules:
-    - name: allow-eu-only
-      priority: 10
-      action: allow
-      conditions:
-        geographic:
-          groupRef: eu-countries
-    
-    - name: block-high-risk
-      priority: 100
-      action: block
-      conditions:
-        geographic:
-          groupRef: high-risk-countries
-```
+Geographic blocking rules go in a `WafPolicy` ConfigMap — the user provides a complete provider policy containing the geographic rule. Note that **Azure Application Gateway WAF does not support geographic filtering** — this use case only applies on AWS and GCP clusters. Azure users requiring geo-filtering must use Azure Front Door or implement it at the application layer.
 
 ## Provider Capability Check
 
@@ -462,7 +320,14 @@ spec:
 
 ---
 
-## Cross-Provider Comparison
+## Design Decision
+
+Geographic blocking is not exposed as a typed field. It belongs in a `WafPolicy` ConfigMap because:
+
+- Azure Application Gateway WAF does not support geographic filtering at all — a typed portable field cannot behave consistently across all three providers
+- Geographic rules (country code lists) are provider-specific in syntax
+
+### Portability validation result
 
 | Feature | AWS WAFv2 | Azure WAF | GCP Cloud Armor |
 |---------|-----------|-----------|-----------------|
@@ -471,89 +336,8 @@ spec:
 | **Multiple countries** | ✅ Array in GeoMatchStatement | N/A | ✅ CEL `in` operator |
 | **Negation (NOT country)** | ✅ NotStatement | N/A | ✅ CEL `!` or `!=` |
 | **Path + geo combination** | ✅ AndStatement | N/A | ✅ CEL `&&` |
-| **Forwarded IP support** | ✅ ForwardedIPConfig | N/A | ✅ Automatic |
-| **Complexity** | Low | High (not supported) | Low |
-| **Fidelity** | Perfect | ❌ Cannot implement | Perfect |
 
----
-
-## Design Decision Impact
-
-### Recommendation: ⚠️ **Include with Clear Azure Limitation**
-
-**Rationale:**
-1. **AWS and GCP have perfect support** (2 out of 3 providers)
-2. **Azure Application Gateway WAF fundamentally does not support geographic rules**
-3. **Common compliance use case** (GDPR, data residency, export controls)
-4. **Users must understand Azure requires different architecture** (Front Door, not App Gateway)
-
-**API Design:**
-```yaml
-spec:
-  customRules:
-    - name: allow-eu-only
-      priority: 10
-      action: allow
-      conditions:
-        geographic:
-          countries:
-            - DE
-            - FR
-            - IT
-          # OR use groupRef
-          # groupRef: eu-countries
-      reason: "GDPR compliance"
-```
-
-### Status Reporting
-
-**AWS (Perfect):**
-```yaml
-status:
-  appliedCustomRules:
-    - name: allow-eu-only
-      appliedStrategy: "native"
-      message: "Using GeoMatchStatement with countries: DE, FR, IT"
-```
-
-**Azure (Not Supported):**
-```yaml
-status:
-  conditions:
-    - type: "GeographicRulesNotSupported"
-      status: "True"
-      reason: "AzureApplicationGatewayWAFLimitation"
-      message: "Azure Application Gateway WAF does not support geographic filtering. For geographic rules, use Azure Front Door instead of Application Gateway, or implement geo-filtering at application level."
-  
-  appliedCustomRules:
-    - name: allow-eu-only
-      appliedStrategy: "not-supported"
-      message: "Geographic rules not supported on Azure Application Gateway WAF. Use Azure Front Door for geographic filtering."
-```
-
-**GCP (Perfect):**
-```yaml
-status:
-  appliedCustomRules:
-    - name: allow-eu-only
-      appliedStrategy: "native"
-      message: "Using CEL expression: origin.region_code in ['DE', 'FR', 'IT']"
-```
-
----
-
-## Implementation Strategy
-
-### AWS KCP Reconciler
-
-
-### Azure KCP Reconciler
-
-
-### GCP KCP Reconciler
-
-
----
+Azure users requiring geographic restrictions must use **Azure Front Door** (not Application Gateway WAF) or implement geo-filtering at the application level.
 
 ## Validation Matrix
 
@@ -565,39 +349,8 @@ status:
 | Request from US to /admin | ✅ Allowed | ❌ Not supported | ✅ Allowed | US admin access allowed |
 | Request from FR to /admin | ✅ Blocked | ❌ Not supported | ✅ Blocked | Non-US admin blocked |
 
----
-
 ## Conclusion
 
-**Geographic filtering works on AWS and GCP, but NOT on Azure Application Gateway WAF.**
+**Geographic filtering works on AWS and GCP via a `WafPolicy` ConfigMap, but is not supported on Azure Application Gateway WAF.**
 
-**Recommendation:** ⚠️ **Include with Clear Azure Limitation**
-
-**Required Documentation:**
-```yaml
-# ⚠️ Azure Application Gateway WAF Limitation
-# 
-# Geographic filtering is NOT supported by Azure Application Gateway WAF.
-# 
-# For geographic rules on Azure, you must use:
-# 1. Azure Front Door (has geo-filtering support)
-# 2. Azure Firewall (network-level geo-blocking)
-# 3. Application-level geolocation libraries
-#
-# WafPolicy with geographic rules will report "not supported" on Azure
-# Application Gateway. Consider using Azure Front Door instead.
-```
-
-**Implementation Priority:**
-1. ✅ AWS: Full support (GeoMatchStatement)
-2. ✅ GCP: Full support (CEL origin.region_code)
-3. ⚠️ Azure: Status warning only, do not create rules
-
-**Real-World Use Cases:**
-- GDPR compliance (EU-only services)
-- Export control compliance (block sanctioned countries)
-- Attack surface reduction (block high-risk regions)
-- Market-specific service availability
-- Data residency requirements
-
-This is a critical compliance feature despite Azure limitation, because geographic restrictions are often legal requirements, not optional preferences.
+Common use cases: GDPR compliance (EU-only services), export control compliance, attack surface reduction, data residency requirements. Despite the Azure limitation, geographic filtering is often a legal requirement and is fully supported on AWS and GCP.

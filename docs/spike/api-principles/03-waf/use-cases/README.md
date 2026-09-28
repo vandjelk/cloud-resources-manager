@@ -10,7 +10,7 @@ The API design is in [../api-specification.md](../api-specification.md).
 These files validate:
 - ✅ Which providers support specific use cases natively
 - ✅ What workarounds are needed per provider
-- ✅ Whether WafConfiguration Phase 2 features are feasible
+- ✅ How use cases map to `WafPolicy` ConfigMap content
 
 ---
 
@@ -21,40 +21,34 @@ These files validate:
 | [00. Specify Managed Rules](00-specify-managed-rules.md) | ✅ Perfect | ✅ Perfect | ✅ Perfect |
 | [01. Managed Rules Override](01-managed-rules-override.md) | ✅ Perfect | ✅ Perfect | ⚠️ Limited |
 | [02. Custom Rule with Conditions](02-custom-rule-with-conditions.md) | ✅ Native | ✅ Native | ✅ Native |
-| [03. Rate Limiting with Path Thresholds](03-rate-limiting-with-path-thresholds.md) | ✅ Native | ✅ Native | ✅ Native |
+| [03. Rate Limiting with Path Thresholds](03-rate-limiting-with-path-thresholds.md) | ✅ Native | ❌ Not supported | ✅ Native |
 | [04. IP Allowlist/Blocklist](04-ip-allowlist-blocklist.md) | ✅ Native | ✅ Native | ✅ Native |
 | [05. Geographic Blocking](05-geographic-blocking.md) | ✅ Native | ❌ Limited | ✅ Native |
-| [06. Size-Based Filtering](06-size-based-filtering.md) | ✅ Native | ✅ Native | ⚠️ Limited |
-| [07. Bot Protection](07-bot-protection.md) | ✅ Native | ✅ Native | ✅ Native |
+| [06. Size-Based Filtering](06-size-based-filtering.md) | ✅ Native | ⚠️ Limited | ⚠️ Limited |
+| [07. Bot Protection](07-bot-protection.md) | ✅ Native | ⚠️ Limited | ✅ Native |
 
 ---
 
 ## Validation Matrix
 
-### Phase 2.1 Features (Validated ✅)
+### Provider Capability Summary
 
-**Core portable features:**
-- ✅ Managed rules override (`ruleOverrides`) - tune managed rules for false positives
-- ✅ Custom rules with conditions (`customRules`) ⭐ Most portable feature - path/header/IP-based protection
-
-**Deferred (too complex for portable abstraction):**
-- ⚠️ Managed rule groups (`managedRuleGroups`) - provider naming/structure too different
-  - Use Case 00 documents why this is deferred
-  - Phase 1 WafPolicy presets already solve this with provider-specific JSON
+| Feature | AWS | Azure | GCP | Via WafPolicy ConfigMap? |
+|---------|-----|-------|-----|----------------|
+| Managed rule groups | ✅ | ✅ | ✅ | ✅ Complete policy per provider |
+| Managed rule override | ✅ | ✅ | ⚠️ Degrades entire ruleset | ✅ Provider-specific override JSON |
+| Custom rules (path/header/IP) | ✅ | ✅ | ✅ | ✅ Complete policy with custom rules |
+| Rate limiting | ✅ | ❌ Not supported | ✅ | ✅ AWS/GCP only |
+| IP allowlist/blocklist | ✅ | ✅ | ✅ | ✅ Complete policy per provider |
+| Geographic blocking | ✅ | ❌ WAF level unsupported | ✅ | ✅ AWS/GCP only |
+| Size-based filtering | ✅ | ⚠️ Global only | ⚠️ Limited | ✅ Provider-specific JSON |
+| Bot protection | ✅ | ⚠️ Limited | ✅ | ✅ Complete policy per provider |
 
 **Implementation notes:**
 - AWS has best native support (nested conditions, full boolean logic)
 - Azure supports AND-only conditions (flat structure)
 - GCP uses CEL expressions (most flexible syntax)
 - Azure applies WAF mode globally (all rule sets in Prevention or Detection)
-
-### Phase 2.2 Features (Requires Further Analysis ⚠️)
-
-**Partial support:**
-- ⚠️ Size-based filtering (AWS/Azure native, GCP limited)
-- ❌ Geographic blocking (Azure doesn't support at WAF level)
-
-**Recommendation**: Phase 2.2 should focus on features with universal support. Geographic blocking should be Phase 2.3+ with documented Azure limitation.
 
 ---
 
@@ -91,8 +85,8 @@ Each use case file follows this structure:
 [Example GCP JSON]
 
 ## Validation Result
-Summary of whether this use case can be supported in Phase 2.
-Links to api-specification.md for how it maps to WafConfiguration.
+Summary of provider support for this use case.
+Links to api-specification.md and implementation-examples.md for how it maps to WafPolicy.
 ```
 
 ---
@@ -103,15 +97,16 @@ Links to api-specification.md for how it maps to WafConfiguration.
 **API design (in api-specification.md) decides how to expose those capabilities.**
 
 Example:
-- **Use Case 03** validates that all providers support custom rules with conditions natively
-- **API Design** includes `customRules` in Phase 2.1 with full confidence
-- **Implementation** (controller) translates to provider-specific format (AWS Statement, Azure matchConditions, GCP CEL)
+- **Use Case 02** validates that all providers support custom rules with conditions natively
+- **API Design** routes these to a `WafPolicy` ConfigMap — users supply a complete provider policy containing the rule
+- **Implementation** (controller) reads the ConfigMap and provisions the cloud WAF resource
 
 ---
 
 ## Cross-References
 
-- See [../api-specification.md](../api-specification.md) for WafConfiguration API design
+- See [../api-specification.md](../api-specification.md) for WafPolicy API design
+- See [../waf-configuration-design.md](../waf-configuration-design.md) for the deferred WafConfiguration exploration
 - See [../research/](../research/) for detailed cross-provider analysis
 - See [../implementation-examples.md](../implementation-examples.md) for complete working examples
 
@@ -125,7 +120,7 @@ To add a new use case:
 2. **List requirements** (what must work)
 3. **Validate on each provider** (AWS, Azure, GCP)
 4. **Show provider-specific examples** (actual JSON/YAML that works)
-5. **Summarize feasibility** (can Phase 2 support this?)
+5. **Summarize feasibility** (can this be handled via a `WafPolicy` ConfigMap? which providers?)
 6. **Link to API design** (don't design API here, reference main spec)
 
 Remember: Use cases validate **provider capabilities**, not **API design**.

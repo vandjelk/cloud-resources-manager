@@ -1,4 +1,4 @@
-# Use Case 3: Custom Rule with Path and Header Conditions
+# Use Case 2: Custom Rule with Path and Header Conditions
 
 ## User Story
 
@@ -55,77 +55,11 @@ condition:
 action: block
 ```
 
-## Portable API Design
+## API Design
 
-```yaml
-apiVersion: cloud-resources.kyma-project.io/v1alpha1
-kind: WafConfiguration
-metadata:
-  name: admin-protection-policy
-spec:
-  # Start from preset that includes managed rules
-  basePolicyRef:
-    name: owasp-moderate
-  
-  # Custom rules for specific threats
-  customRules:
-    - name: block-debug-header-on-admin
-      priority: 100
-      action: block
-      conditions:
-        path:
-          prefix: "/admin"
-        header:
-          name: "X-Debug"
-          exists: true
-        sourceIP:
-          cidr: "10.0.0.0/8"
-          negate: true  # Block if NOT from internal network
-      reason: "Debug header on admin paths only allowed from internal network"
-    
-    - name: block-forwarded-header-on-admin-login
-      priority: 110
-      action: block
-      conditions:
-        path:
-          exact: "/admin/login"
-        method: POST
-        header:
-          name: "X-Forwarded-For"
-          exists: true
-      reason: "Prevent rate limit bypass via X-Forwarded-For on admin login"
-    
-    - name: block-scanner-user-agent
-      priority: 120
-      action: block
-      conditions:
-        path:
-          prefix: "/admin"
-        header:
-          name: "User-Agent"
-          anyOf:
-            - contains: "sqlmap"
-            - contains: "nikto"
-            - contains: "nmap"
-      reason: "Block known security scanners on admin paths"
-    
-    - name: block-suspicious-content-type
-      priority: 130
-      action: block
-      conditions:
-        path:
-          prefix: "/admin"
-        method: POST
-        header:
-          name: "Content-Type"
-          value: "application/x-www-form-urlencoded"
-          negate: true  # Block if NOT standard form encoding
-        header:
-          name: "Content-Type"
-          value: "application/json"
-          negate: true  # AND NOT JSON
-      reason: "Only allow standard content types on admin POST"
-```
+Custom rules with path, header, and IP conditions are **genuinely portable** across all three providers — the condition types translate cleanly (see the provider capability check below).
+
+Custom rules go in a `WafPolicy` ConfigMap — the user provides a complete provider policy containing the rule. See the provider capability check below for the exact JSON per provider.
 
 ## Provider Capability Check
 
@@ -545,7 +479,19 @@ spec:
 
 ---
 
-## Cross-Provider Comparison
+## Design Decision
+
+### Why there is no typed `customRules` field
+
+Custom rules with path, header, and IP conditions are genuinely portable — all three providers support them natively. They are delivered via a `WafPolicy` ConfigMap containing the complete provider policy. A typed `customRules` field is not part of any currently specified resource because:
+
+- Exposing them as typed fields covers only one portable concept while leaving size filtering, geographic blocking, and managed rule tuning requiring provider-specific JSON anyway
+- A partial typed middle layer adds API surface without eliminating the need for the escape hatch
+- The cleaner boundary is: all rule-level expression — portable or not — belongs in a `WafPolicy` ConfigMap
+
+Users who need custom rules supply a `WafPolicy` referencing a ConfigMap with provider-specific JSON. The provider knowledge required is explicit, not hidden.
+
+### Portability validation result
 
 | Feature | AWS WAFv2 | Azure WAF | GCP Cloud Armor |
 |---------|-----------|-----------|-----------------|
@@ -556,126 +502,6 @@ spec:
 | **IP matching** | ✅ CIDR, negation | ✅ CIDR, negation | ✅ CEL: inIpRange(), negation |
 | **Boolean logic** | ✅ Nested AND/OR/NOT | ⚠️ AND only (flat) | ✅ CEL: &&, \|\|, ! |
 | **Multiple values OR** | ✅ OrStatement | ✅ Multiple matchValues | ✅ CEL: \|\| |
-| **Complexity** | Low | Low | Low |
-| **Fidelity** | Perfect | Perfect | Perfect |
-
-## Design Decision Impact
-
-### API Design
-
-✅ **Include `customRules` field** - this works great across all providers:
-
-```yaml
-spec:
-  customRules:
-    - name: block-suspicious-admin-access
-      priority: 100
-      action: block
-      conditions:
-        path:
-          prefix: "/admin"
-        header:
-          name: "X-Debug"
-          exists: true
-        sourceIP:
-          cidr: "10.0.0.0/8"
-          negate: true
-      reason: "Block debug header on admin from public internet"
-```
-
-**Key Features:**
-- `name`: Human-readable identifier
-- `priority`: Evaluation order (lower = higher priority)
-- `action`: block, allow, count
-- `conditions`: Path, headers, IP, method matching
-- `reason`: Explanation for audit/documentation
-
-**Rationale:**
-- ✅ All 3 providers have perfect support
-- ✅ Critical security feature (custom threat protection)
-- ✅ Common use case (protect admin interfaces, block scanners)
-- ✅ Clean portable API maps well to all providers
-
----
-
-### Relationship to Other Features
-
-**Custom Rules vs Rule Overrides:**
-
-| Feature | Purpose | Portability | When to Use |
-|---------|---------|-------------|-------------|
-| **customRules** | Define new blocking/allowing rules | ✅ Perfect (all providers) | Path-specific protection, scanner blocking, custom threats, conditional bypasses |
-| **ruleOverrides** | Change managed rule actions globally | ✅ Great (AWS/Azure perfect, GCP partial) | Tune managed rules for false positives |
-
-**Example combining both:**
-```yaml
-spec:
-  # Start from preset that includes managed rules
-  basePolicyRef:
-    name: owasp-moderate
-  
-  # Tune managed rules for false positives (unconditional)
-  ruleOverrides:
-    - managedRuleGroup: AWSManagedRulesCommonRuleSet  # AWS-specific name
-      ruleId: "GenericRFI_BODY"  # AWS-specific rule name
-      action: count
-      reason: "Known false positive on API endpoints with URL parameters"
-  
-  # Custom rules for specific threats and conditional bypasses
-  customRules:
-    - name: health-check-bypass
-      priority: 10
-      action: allow
-      conditions:
-        path:
-          exact: "/health"
-      reason: "Bypass WAF for health checks"
-    
-    - name: block-debug-on-admin-external
-      priority: 100
-      action: block
-      conditions:
-        path:
-          prefix: "/admin"
-        header:
-          name: "X-Debug"
-          exists: true
-        sourceIP:
-          cidr: "10.0.0.0/8"
-          negate: true
-      reason: "Block debug header on admin from external IPs"
-    
-    - name: internal-admin-bypass
-      priority: 20
-      action: allow
-      conditions:
-        path:
-          prefix: "/admin"
-        sourceIP:
-          cidr: "10.0.0.0/8"
-      reason: "Allow internal admin traffic"
-```
-
----
-
-### Implementation Notes
-
-**AWS KCP Reconciler**:
-- Custom rules use `Action` (not `OverrideAction` like managed rules)
-- Conditions combined with `AndStatement` or `OrStatement`
-- Supports nested boolean logic with `NotStatement`
-
-**Azure KCP Reconciler**:
-- Custom rules defined in `customRules` array
-- Each rule has `matchConditions` (all conditions are AND)
-- Use `negationConditon: true` for negation
-
-**GCP KCP Reconciler**:
-- Custom rules use CEL (Common Expression Language) expressions
-- CEL supports rich boolean logic: `&&`, `||`, `!`, `has()`, `matches()`, `contains()`
-- Very flexible and expressive
-
----
 
 ## Validation Matrix
 
@@ -688,21 +514,9 @@ spec:
 | User-Agent contains "sqlmap" on /admin | ✅ Block | ✅ Block | ✅ Block | Scanner blocked |
 | User-Agent contains "Chrome" on /admin | ✅ Allow | ✅ Allow | ✅ Allow | Legitimate browser allowed |
 
----
-
 ## Conclusion
 
-**Custom rules with path and header conditions work perfectly across all providers.**
+**Custom rules with path and header conditions work perfectly across all providers — delivered via a `WafPolicy` ConfigMap.**
 
-This is the **most portable** feature of the WAF API:
-- ✅ Use Case 1 (Managed rules override): AWS + Azure perfect, GCP partial
-- ✅ Use Case 3 (Custom rules): **All providers perfect** ⭐
+The provider capability is fully validated. Users who need these rules supply a `WafPolicy` referencing a ConfigMap with provider-specific JSON. The provider translations in the "Provider Capability Check" sections above serve as the reference for what to put in those ConfigMaps.
 
-**Recommendation:** ✅ **Prioritize implementing `customRules` first**
-
-**Implementation Order:**
-1. **Phase 2.1:** `ruleOverrides` + `customRules` (universal or great support)
-2. **Phase 2.2:** `managedRuleGroups` (portable managed rule selection - when validated)
-3. **Phase 2.3:** Advanced features (sizeLimits, geoBlocking, etc.)
-
-This use case validates that path + header + IP conditions work great for custom rules across all providers!

@@ -55,7 +55,7 @@ preconfiguredWafRules:
 | XSS Protection | (Included in CommonRuleSet) | (Included in DefaultRuleSet) | `xss-v33-stable` |
 | Bot Protection | `AWSManagedRulesBotControlRuleSet` | `Microsoft_BotManagerRuleSet` | `cve-canary` |
 
-**Solution:** Use Phase 1 WafPolicy with provider-specific `spec.data` JSON.
+**Current path:** A `WafPolicy` referencing a user-provided ConfigMap with complete provider JSON. A `WafConfiguration` intent-based approach (where `OwaspTop10` resolves to provider presets) is explored but deferred — see [waf-configuration-design.md](../waf-configuration-design.md).
 
 ## Provider Capability Check
 
@@ -285,7 +285,7 @@ preconfiguredWafRules:
 
 ### API Design
 
-❌ **DO NOT include `managedRuleGroups` in portable WafConfiguration** - provider differences are too significant:
+`managedRuleGroups` is not a portable typed field — provider differences are too significant:
 
 **Why not portable:**
 1. **Naming inconsistency:** AWS "CommonRuleSet" vs Azure "DefaultRuleSet" vs GCP "owasp-crs-v030301-id"
@@ -293,85 +293,24 @@ preconfiguredWafRules:
 3. **Version management:** GCP uses explicit versions, AWS/Azure auto-update
 4. **False abstraction:** A portable name hides real provider differences and creates confusion
 
-**Correct approach:**
-- **Phase 1 WafPolicy presets** already include provider-specific managed rules in `spec.data`
-- Users can create custom WafPolicy with provider-specific JSON for full control
-- **Phase 2 WafConfiguration** focuses on portable features: `ruleOverrides` and `customRules`
+**Current approach:**
+- Users who need full control create a `WafPolicy` referencing a user-owned ConfigMap with complete provider JSON
+- An intent-based abstraction (where `OwaspTop10` resolves to provider presets) is explored but deferred — see [waf-configuration-design.md](../waf-configuration-design.md)
 
 ---
 
-### Implementation Notes
+### Using managed rules
 
-**Phase 1: WafPolicy with spec.data (provider-specific JSON)**
-
-Users specify managed rule groups using provider-native JSON:
-
-**AWS example:**
 ```yaml
 apiVersion: cloud-resources.kyma-project.io/v1beta1
 kind: WafPolicy
 metadata:
   name: my-aws-policy
 spec:
-  data: |
-    {
-      "Rules": [
-        {
-          "Name": "AWSManagedRulesCommonRuleSet",
-          "Priority": 1000,
-          "Statement": {
-            "ManagedRuleGroupStatement": {
-              "VendorName": "AWS",
-              "Name": "AWSManagedRulesCommonRuleSet"
-            }
-          }
-        }
-      ]
-    }
+  configMapRef:
+    name: my-waf-config   # complete provider WAF policy JSON, same namespace
 ```
-
-**Azure example:**
-```yaml
-apiVersion: cloud-resources.kyma-project.io/v1beta1
-kind: WafPolicy
-metadata:
-  name: my-azure-policy
-spec:
-  data: |
-    {
-      "managedRules": {
-        "managedRuleSets": [
-          {
-            "ruleSetType": "Microsoft_DefaultRuleSet",
-            "ruleSetVersion": "2.1"
-          }
-        ]
-      }
-    }
-```
-
-**GCP example:**
-```yaml
-apiVersion: cloud-resources.kyma-project.io/v1beta1
-kind: WafPolicy
-metadata:
-  name: my-gcp-policy
-spec:
-  data: |
-    {
-      "rules": [
-        {
-          "priority": 1000,
-          "action": "deny(403)",
-          "match": {
-            "expr": {
-              "expression": "evaluatePreconfiguredWaf('owasp-crs-v030301-id')"
-            }
-          }
-        }
-      ]
-    }
-```
+The referenced ConfigMap contains a complete provider WAF policy (see `implementation-examples.md` for content).
 
 ---
 
@@ -386,34 +325,8 @@ spec:
 
 ---
 
-## Recommendation
-
-**Decision:** ⚠️ **DEFERRED - Too complex for portable API**
-
-**Rationale:**
-1. **Provider naming differences:** AWS "CommonRuleSet" vs Azure "DefaultRuleSet" vs GCP "owasp-crs-v030301-id"
-2. **Structural differences:** Azure includes SQL injection in DefaultRuleSet, AWS separates it
-3. **Version management:** GCP has explicit versions, AWS/Azure auto-update
-4. **False portability:** Abstraction would hide real provider differences
-
-**Alternative Approach:**
-- **Phase 1:** WafPolicy presets (owasp-moderate, owasp-strict) already include provider-specific managed rules in `spec.data`
-- **Phase 2.1:** Users customize via `ruleOverrides` (unconditional) and `customRules` (with conditions)
-- **Future:** If strong user demand, revisit portable `managedRuleGroups` with clear provider mapping table
-
-**For now:**
-Users who need different managed rule groups should:
-1. Use WafPolicy directly with provider-specific JSON (full control)
-2. Or start from preset and use `ruleOverrides` to tune behavior
-
-**This use case remains valuable** for validating provider capabilities, even though we defer the portable API.
-
----
-
 ## Conclusion
 
-**Specifying managed rule groups is foundational, but too complex for a portable abstraction right now.**
+**Specifying managed rule groups is foundational, but too provider-specific for a portable typed field.**
 
-Phase 1 WafPolicy presets already solve this with provider-specific JSON. Phase 2.1 focuses on the features that ARE portable: `ruleOverrides` and `customRules`.
-
-**Marked as Use Case 00** because it's conceptually first, but **deferred from Phase 2 implementation** due to mapping complexity.
+Users who need full control create a `WafPolicy` referencing a user-owned ConfigMap with complete provider JSON. An intent-based abstraction is explored but deferred — see [waf-configuration-design.md](../waf-configuration-design.md).

@@ -50,98 +50,9 @@ total_headers_size: 64 KB
 reason: "Prevent slowloris and header smuggling attacks"
 ```
 
-## Portable API Design
+## API Design
 
-```yaml
-apiVersion: cloud-resources.kyma-project.io/v1alpha1
-kind: WafConfiguration
-metadata:
-  name: size-based-policy
-spec:
-  # Start from preset that includes managed rules
-  basePolicyRef:
-    name: owasp-moderate
-  
-  # Global size limits (applied to all requests)
-  sizeLimits:
-    maxBodySizeKB: 128              # Default: 128 KB
-    maxQueryStringLengthBytes: 2048  # Default: 2048 bytes
-    maxUriLengthBytes: 8192          # Default: 8192 bytes
-    maxSingleHeaderSizeKB: 8         # Default: 8 KB
-    maxHeadersSizeKB: 64             # Default: 64 KB total
-  
-  # Custom rules for path-specific size limits
-  customRules:
-    # Health check: minimal payload
-    - name: health-check-tiny-body
-      priority: 50
-      action: block
-      conditions:
-        path:
-          exact: "/health"
-        bodySize:
-          maxKB: 1
-          exceeds: true  # Block if exceeds
-      reason: "Health checks should have no body"
-    
-    # Admin panel: small commands only
-    - name: admin-small-body
-      priority: 100
-      action: block
-      conditions:
-        path:
-          prefix: "/admin"
-        bodySize:
-          maxKB: 10
-          exceeds: true
-      reason: "Admin commands are small; large body indicates attack"
-    
-    # GraphQL: moderate size limit
-    - name: graphql-moderate-body
-      priority: 110
-      action: block
-      conditions:
-        path:
-          exact: "/api/graphql"
-        method: POST
-        bodySize:
-          maxKB: 1024  # 1 MB
-          exceeds: true
-      reason: "GraphQL queries should be under 1 MB"
-    
-    # File upload: allow larger bodies
-    - name: upload-large-body-allowed
-      priority: 120
-      action: allow
-      conditions:
-        path:
-          exact: "/api/upload"
-        method: POST
-        bodySize:
-          maxKB: 10240  # 10 MB
-          exceeds: false  # Allow if within limit
-      reason: "Upload endpoint allows up to 10 MB"
-    
-    # Query string attack prevention
-    - name: block-long-query-strings
-      priority: 200
-      action: block
-      conditions:
-        queryStringLength:
-          maxBytes: 2048
-          exceeds: true
-      reason: "Long query strings indicate injection attempts"
-    
-    # URI length attack prevention
-    - name: block-long-uris
-      priority: 210
-      action: block
-      conditions:
-        uriLength:
-          maxBytes: 8192
-          exceeds: true
-      reason: "Excessively long URIs indicate attack"
-```
+Size-based filtering rules go in a `WafPolicy` ConfigMap — the user provides a complete provider policy. Provider support is uneven — see the provider capability check below.
 
 ## Provider Capability Check
 
@@ -425,141 +336,39 @@ maxStreamDuration: 60s
 
 ---
 
-## Cross-Provider Comparison
+## Design Decision
+
+Size-based filtering is not exposed as typed fields. It belongs in a `WafPolicy` ConfigMap because:
+
+- Provider support is too uneven for a meaningful portable typed field
+- Azure supports only global body size limits, not per-path
+- GCP cannot check request body size in Cloud Armor rules at all
+- AWS's `SizeConstraintStatement` has no equivalent on other providers
+
+### Portability validation result
 
 | Feature | AWS WAFv2 | Azure WAF | GCP Cloud Armor |
 |---------|-----------|-----------|-----------------|
-| **Request body size check** | ✅ Per-rule | ⚠️ Global only | ❌ Backend service only |
+| **Request body size check** | ✅ Per-rule | ⚠️ Global only (128 KB max) | ❌ Backend service only |
 | **Query string size check** | ✅ Per-rule | ❌ No | ✅ CEL `size(request.query)` |
 | **URI path size check** | ✅ Per-rule | ❌ No | ✅ CEL `size(request.path)` |
-| **Header size check** | ✅ Per-rule | ❌ No | ⚠️ Limited |
 | **Per-path size limits** | ✅ AndStatement | ❌ Global only | ⚠️ Query/URI only |
-| **Comparison operators** | GT, LT, GE, LE, EQ, NE | N/A | `>`, `<`, `>=`, `<=`, `==` |
-| **Global size policy** | ✅ Per-rule | ✅ Policy level | ⚠️ Backend service |
-| **Complexity** | Low | High (limited) | Medium |
-| **Fidelity** | Perfect | Poor | Partial |
-
----
-
-## Design Decision Impact
-
-### Recommendation: ⚠️ **Include with Provider Limitations**
-
-**Rationale:**
-1. **AWS has excellent support** - full per-rule size constraints
-2. **Azure has poor support** - only global body size limit
-3. **GCP has partial support** - query/URI size checks, but not body
-4. **Common security need** - resource exhaustion prevention
-
-**API Design:**
-
-```yaml
-spec:
-  # Global size limits (supported on Azure, ignored on AWS/GCP in favor of per-rule)
-  sizeLimits:
-    maxBodySizeKB: 128
-    maxQueryStringLengthBytes: 2048
-    maxUriLengthBytes: 8192
-  
-  # Per-rule size constraints (AWS excellent, GCP partial, Azure not supported)
-  customRules:
-    - name: admin-small-body
-      priority: 100
-      action: block
-      conditions:
-        path: {prefix: "/admin"}
-        bodySize:
-          maxKB: 10
-          exceeds: true
-      reason: "Admin commands should be small"
-```
-
-### Status Reporting
-
-**AWS (Perfect):**
-```yaml
-status:
-  appliedCustomRules:
-    - name: admin-small-body
-      appliedStrategy: "native"
-      message: "Using SizeConstraintStatement: body > 10240 bytes on /admin"
-```
-
-**Azure (Limited):**
-```yaml
-status:
-  conditions:
-    - type: "PerPathSizeLimitsNotSupported"
-      status: "True"
-      reason: "AzureWAFLimitation"
-      message: "Azure Application Gateway WAF only supports global maxRequestBodySizeInKb (128 KB). Per-path size constraints cannot be implemented."
-  
-  appliedSizeLimits:
-    maxBodySizeKB: 128  # Global only
-```
-
-**GCP (Partial):**
-```yaml
-status:
-  conditions:
-    - type: "BodySizeCheckNotSupported"
-      status: "True"
-      reason: "GCPCloudArmorLimitation"
-      message: "GCP Cloud Armor cannot check request body size in security policy rules. Body size limits must be configured at backend service level. Query string and URI size checks are supported."
-  
-  appliedCustomRules:
-    - name: block-long-query-strings
-      appliedStrategy: "native"
-      message: "Using CEL: size(request.query) > 2048"
-```
-
----
-
-## Implementation Strategy
-
-### AWS KCP Reconciler
-
-
-### Azure KCP Reconciler
-
-
-### GCP KCP Reconciler
-
-
----
 
 ## Validation Matrix
 
 | Test Case | AWS | Azure | GCP | Expected Behavior |
 |-----------|-----|-------|-----|-------------------|
 | POST /health with 2 KB body | ✅ Blocked | ⚠️ Allowed (no per-path) | ❌ Not checked | Health check should have no body |
-| POST /admin with 20 KB body | ✅ Blocked | ⚠️ Allowed (global 128KB) | ❌ Not checked | Admin body too large |
-| POST /api/graphql with 2 MB body | ✅ Blocked | ✅ Blocked (global 128KB) | ❌ Not checked | GraphQL body too large |
+| POST /admin with 20 KB body | ✅ Blocked | ⚠️ Allowed (global 128 KB) | ❌ Not checked | Admin body too large |
+| POST /api/graphql with 2 MB body | ✅ Blocked | ✅ Blocked (global 128 KB) | ❌ Not checked | GraphQL body too large |
 | GET /api with 3 KB query string | ✅ Blocked | ❌ Not checked | ✅ Blocked | Query string too long |
 | GET /somepath with 10 KB URI | ✅ Blocked | ❌ Not checked | ✅ Blocked | URI too long |
-| POST /api/upload with 5 MB body | ✅ Allowed (per-path rule) | ✅ Blocked (global limit) | ❌ Not checked | Upload endpoint allows large body |
-
----
 
 ## Conclusion
 
-**Size-based filtering has mixed support across providers:**
-- ✅ **AWS**: Excellent - full per-rule size constraints for body, query, URI, headers
-- ⚠️ **Azure**: Poor - only global body size limit, no per-path constraints
-- ⚠️ **GCP**: Partial - query/URI size checks, but no body size in security policy
+**Size-based filtering has uneven provider support:**
+- **AWS**: Full per-rule size constraints via `SizeConstraintStatement`
+- **Azure**: Global body size limit only — per-path constraints require Azure API Management
+- **GCP**: Query/URI size checks only — body size limits configured at backend service level, not in Cloud Armor
 
-**Recommendation:** ⚠️ **Include with Clear Limitations**
-
-**Implementation Priority:**
-1. ✅ AWS: Full support (SizeConstraintStatement)
-2. ⚠️ Azure: Global size limit only, warn about per-path limitation
-3. ⚠️ GCP: Query/URI size checks only, warn about body size limitation
-
-**Real-World Use Cases:**
-- Resource exhaustion prevention
-- Upload bomb protection
-- Query injection attack mitigation
-- Buffer overflow prevention
-- DoS attack mitigation
-
-**Key Insight:** Size-based filtering is a critical security control, but Azure and GCP have significant limitations. Users targeting Azure should consider Azure API Management for per-API size policies, and GCP users should configure body size limits at backend service level.
+Users who need size-based filtering supply a `WafPolicy` referencing a ConfigMap with provider-specific JSON. The provider capability sections above serve as the reference for what to put in those ConfigMaps.
